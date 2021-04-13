@@ -141,6 +141,7 @@
   <ItemGroup>
     <ClCompile Include="HMM.cpp" />
     <ClCompile Include="Main.cpp" />
+    <ClCompile Include="MatUtil.cpp" />
     <ClCompile Include="ProbInit.cpp" />
   </ItemGroup>
   <ItemGroup>

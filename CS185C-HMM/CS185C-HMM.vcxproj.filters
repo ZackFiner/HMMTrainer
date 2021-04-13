@@ -24,6 +24,9 @@
     <ClCompile Include="ProbInit.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="MatUtil.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HMM.h">
