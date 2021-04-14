@@ -57,6 +57,22 @@ int HMM::getStateAtT(unsigned int t) {
 	return max_idx;
 }
 
+int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
+	alphaPass(obs, size); // calculate alpha
+	betaPass(obs, size); // calculate beta
+	calcSeqProb(); // calculate P(O | lm)
+	calcGamma(obs, size); // calculate the gammas and di-gammas
+
+	print_matrix(gamma, T, N, true);
+
+	int* r_array = new int[size];
+	for (unsigned int t = 0; t < size; t++) {
+		r_array[t] = getStateAtT(t);
+	}
+
+	return r_array;
+}
+
 void HMM::alphaPass(unsigned int* obs, unsigned int size) {
 	alpha = new float* [size];
 	T = size;

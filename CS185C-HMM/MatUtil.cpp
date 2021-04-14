@@ -68,14 +68,19 @@ float* alloc_vec(float* init, unsigned int N) {
 	return r_val;
 }
 
-void print_matrix(float** mat, unsigned int N, unsigned int M) {
+void print_matrix(float** mat, unsigned int N, unsigned int M, bool transpose) {
 
 	float abs_max = get_max_abs(mat, N, M);
 	int max_padding = std::to_string(abs_max).length() + 5;
-	for (unsigned int i = 0; i < N; i++) {
+
+	unsigned int width = transpose ? M : N;
+	unsigned int height = transpose ? N : M;
+
+
+	for (unsigned int i = 0; i < width; i++) {
 		std::cout << "\n|";
-		for (unsigned int j = 0; j < M; j++) {
-			float v = mat[i][j];
+		for (unsigned int j = 0; j < height; j++) {
+			float v = transpose ? mat[j][i] : mat[i][j];
 			auto num = std::to_string(v);
 			int l = num.length();
 			int padding = max_padding - l;
