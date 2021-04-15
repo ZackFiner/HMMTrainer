@@ -1,7 +1,6 @@
 #include "HMM.h"
 #include "ProbInit.h"
 #include "MatUtil.h"
-#include <iostream>
 
 HMM::HMM() {
 
@@ -63,8 +62,7 @@ int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
 	alphaPass(obs, size, alpha, coeffs); // calculate alpha
 	betaPass(obs, size, beta, coeffs); // calculate beta
 
-	calcGamma(obs, size, alpha, beta, gamma); // calculate the gammas and di-gammas
-	calcDigamma(obs, size, alpha, beta, digamma);
+	calcGamma(obs, size, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
 
 	print_matrix(gamma, size, N, true);
 
@@ -147,40 +145,36 @@ void HMM::betaPass(unsigned int* obs, unsigned int size, float** beta, float* co
 
 }
 
-void HMM::calcGamma(unsigned int* obs, unsigned int size, float** alpha, float** beta, float** gamma) {
-	float seqProb = this->calcSeqProb(alpha, size);
-	float div = 1.0f/seqProb;// 1/P(O | lm)
+void HMM::calcGamma(unsigned int* obs, unsigned int size, float** alpha, float** beta, float** gamma, float*** digamma) {
+	float div = 1e-10f;
 	float val;
-	for (unsigned int t = 0; t < size; t++) {
-		float scale = 1e-10f;
+	for (unsigned int t = 0; t < size-1; t++) {
+		div = 1e-10f;
 		for (unsigned int i = 0; i < N; i++) {
-			val = alpha[t][i] * beta[t][i] * div;
-			gamma[t][i] = val;
-			scale += val;
-		}
-
-		scale = 1.0f / scale;
-		for (unsigned int i = 0; i < N; i++)
-			gamma[t][i] *= scale;
-	}
-}
-
-void HMM::calcDigamma(unsigned int* obs, unsigned int size, float** alpha, float** beta, float*** digamma) {
-	float seqProb = this->calcSeqProb(alpha, size);
-	float div = 1.0f / seqProb;// 1/P(O | lm)
-
-	for (unsigned int t = 0; t < size - 1; t++) {
-		for (unsigned int i = 0; i < N; i++) {
-			// float sum = 0;
-			float scale = 1e-10f;
 			for (unsigned int j = 0; j < N; j++) {
-				float val = alpha[t][i] * this->A[i][j] * this->B[obs[t]][j] * beta[t][j] * div;
-				digamma[t][i][j] = val;
-				// sum += val;
+				div += alpha[t][i] * A[i][j] * B[obs[t + 1]][j] * beta[t + 1][j];
 			}
-			//this->gamma[t][i] = sum;
-		} // NOTE: we could calculate gamma using digamma by taking the sum over j
+		}
+		div = 1.0f / div;
+		for (unsigned int i = 0; i < N; i++) {
+			gamma[t][i] = 0.0f;
+			for (unsigned int j = 0; j < N; j++) {
+				val = alpha[t][i] * A[i][j] * B[obs[t + 1]][j] * beta[t + 1][j] * div;
+				digamma[t][i][j] = val;
+				gamma[t][i] += val;
+			}
+		}
 	}
+	div = 1e-10f;
+	for (unsigned int i = 0; i < N; i++)
+		div += alpha[size - 1][i];
+	div = 1.0f / div;
+
+	for (unsigned int i = 0; i < N; i++)
+		gamma[size - 1][i] = alpha[size - 1][i] * div;
+
+
+
 }
 
 void HMM::applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma) {
@@ -215,4 +209,9 @@ void HMM::applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 
 		}
 	}
+}
+
+
+void HMM::trainModel(const std::vector<std::vector<unsigned int>>& dataset, unsigned int iterations, unsigned int n_folds) {
+
 }

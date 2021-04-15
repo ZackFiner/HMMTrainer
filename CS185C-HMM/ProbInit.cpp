@@ -1,7 +1,10 @@
 #include "ProbInit.h"
 #include <random>
+#include <chrono>
+#include <iostream>
+#include <math.h>
 
-#define EPSILON 1e-6f
+#define EPSILON 1e-10f
 
 DefaultProbInit::DefaultProbInit(float _variance) {
 	this->variance = _variance; // this should be > 0 and < 1
@@ -38,9 +41,12 @@ float* DefaultProbInit::PiIinit(unsigned int N) {
 }
 
 void DefaultProbInit::initializeStochasticRow(float* row, unsigned int size) {
+	auto seed = std::chrono::system_clock::now().time_since_epoch().count();
+
 	float mean = 1.0f / size;
 	float true_variance = this->variance * mean;
 	std::default_random_engine gen;
+	gen.seed(seed);
 	std::uniform_real_distribution<float> random_nums(-true_variance, true_variance);
 	float accum = 0;
 	for (unsigned int i = 0; i < size; i++) {
@@ -51,9 +57,7 @@ void DefaultProbInit::initializeStochasticRow(float* row, unsigned int size) {
 
 	if (accum > EPSILON || accum < -EPSILON) { // if our accumulator is not roughly 0 (meaning that our row doesn't obey the stochastic property)
 		std::vector<unsigned int> targets;
-		float mult = 1.0f;
 		if (accum > EPSILON) { // if we're too high
-			mult = -1.0f;
 			for (unsigned int i = 0; i < size; i++)
 				if (row[i] > mean) // find all values that are greater than the mean
 					targets.push_back(i);
@@ -64,11 +68,9 @@ void DefaultProbInit::initializeStochasticRow(float* row, unsigned int size) {
 					targets.push_back(i);
 		}
 
-		float correction = accum / targets.size() * mult;
+		float correction = accum / targets.size();
 
 		for (unsigned int index : targets)
-			row[index] += correction; // add some fraction of the amount that we're over to maintain the stochastic property 
+			row[index] -= correction; // add some fraction of the amount that we're over to maintain the stochastic property 
 	}
-
-
 }

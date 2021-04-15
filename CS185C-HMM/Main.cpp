@@ -3,7 +3,7 @@
 #include <iostream>
 #include "HMM.h"
 #include "MatUtil.h"
-
+#include "ProbInit.h"
 
 int main() {
 	std::cout << "Assignment 6 - HMM alpha_pass and beta_pass functions (+gamma)" << std::endl;
@@ -48,8 +48,8 @@ int main() {
 	}
 
 	std::cout << std::endl;
-
 	while (true);
+
 	delete[] O;
 	delete[] S;
 
