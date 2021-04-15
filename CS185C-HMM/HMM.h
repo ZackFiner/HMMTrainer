@@ -10,17 +10,20 @@ public:
 	~HMM();
 	int* getIdealStateSequence(unsigned int* obs, unsigned int size);
 private:
-	int getStateAtT(unsigned int t);
-	void alphaPass(unsigned int* obs, unsigned int size);
-	void betaPass(unsigned int* obs, unsigned int size);
-	void calcGamma(unsigned int* obs, unsigned int size);
-	void calcSeqProb();
+	int getStateAtT(float** gamma, unsigned int size, unsigned int t);
+	void alphaPass(unsigned int* obs, unsigned int size, float** alpha);
+	void betaPass(unsigned int* obs, unsigned int size, float** beta);
+	void calcGamma(unsigned int* obs, unsigned int size, float** alpha, float **beta, float** gamma);
+	void calcDigamma(unsigned int* obs, unsigned int size, float** alpha, float** beta, float*** digamma);
 
-	float seqProb;
-	float **alpha=nullptr, **beta=nullptr, **coeffs=nullptr, **gamma=nullptr, ***digamma=nullptr, **A, **B;
+	void applyAdjust(float** gamma, float*** digamma, unsigned int size);
+
+	void calcCoeffs(float** alpha, unsigned int size);
+	float calcSeqProb(float** alpha, unsigned int size);
+
+	float **A, **B;
 	float *Pi;
 	unsigned int N, M;
-	unsigned int T;
 
 };
 

@@ -36,19 +36,13 @@ HMM::~HMM() {
 	delete_array(this->A, N, N);
 	delete_array(this->B, M, N); // remember, B is transposed
 	delete[] this->Pi;
-	if (this->alpha)
-		delete_array(this->alpha, T, N);
-	if (this->beta)
-		delete_array(this->beta, T, N);
-
-	// TODO: delete the gammas, coeffs, and di-gammas
 }
 
-int HMM::getStateAtT(unsigned int t) {
+int HMM::getStateAtT(float** gamma, unsigned int size, unsigned int t) {
 	float max = -1.0f;
 	int max_idx = -1;
 	for (unsigned int i = 0; i < N; i++) {
-		float state_prob = this->gamma[t][i];
+		float state_prob = gamma[t][i];
 		if (max < state_prob) {
 			max_idx = i;
 			max = state_prob;
@@ -73,12 +67,7 @@ int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
 	return r_array;
 }
 
-void HMM::alphaPass(unsigned int* obs, unsigned int size) {
-	alpha = new float* [size];
-	T = size;
-	for (unsigned int i = 0; i < size; i++)
-		alpha[i] = new float[N];
-
+void HMM::alphaPass(unsigned int* obs, unsigned int size, float** alpha) {
 	for (unsigned int i = 0; i < N; i++)
 		alpha[0][i] = Pi[i] * B[obs[0]][i]; // B has been transposed to improve spatial locality
 
@@ -95,21 +84,18 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size) {
 	
 }
 
-void HMM::calcSeqProb() {
-	if (this->alpha) {
+float HMM::calcSeqProb(float** alpha, unsigned int size) {
+	float seqProb = 0.0f;
+	if (alpha) {
 		float sum = 0;
 		for (unsigned int i = 0; i < N; i++)
-			sum += this->alpha[T - 1][i]; // sum of all hidden state probabilities at at the last state
-		this->seqProb = sum;
+			sum += alpha[size - 1][i]; // sum of all hidden state probabilities at at the last state
+		seqProb = sum;
 	}
+	return seqProb;
 }
 
-void HMM::betaPass(unsigned int* obs, unsigned int size) {
-	beta = new float* [size];
-	T = size;
-	for (unsigned int i = 0; i < size; i++)
-		beta[i] = new float[N];
-
+void HMM::betaPass(unsigned int* obs, unsigned int size, float** beta) {
 	for (unsigned int i = 0; i < N; i++)
 		beta[size - 1][i] = 1;
 
@@ -125,40 +111,63 @@ void HMM::betaPass(unsigned int* obs, unsigned int size) {
 
 }
 
-void HMM::calcGamma(unsigned int* obs, unsigned int size) {
-	if (!this->gamma) {
-		this->gamma = new float*[T];
-		for (unsigned int i = 0; i < T; i++)
-			this->gamma[i] = new float[N];
-	}
-
-	if (!this->digamma) {
-		this->digamma = new float** [T-1];
-		for (unsigned int i = 0; i < T-1; i++) {
-			this->digamma[i] = new float* [N];
-			for (unsigned int j = 0; j < N; j++)
-				this->digamma[i][j] = new float[N];
-		}
-			
-			
-	}
-
-	float div = 1.0f/this->seqProb;// 1/P(O | lm)
-	for (unsigned int t = 0; t < T; t++) {
+void HMM::calcGamma(unsigned int* obs, unsigned int size, float** alpha, float** beta, float** gamma) {
+	float seqProb = this->calcSeqProb(alpha, size);
+	float div = 1.0f/seqProb;// 1/P(O | lm)
+	for (unsigned int t = 0; t < size; t++) {
 		for (unsigned int i = 0; i < N; i++) {
-			this->gamma[t][i] = this->alpha[t][i] * this->beta[t][i] * div;
+			gamma[t][i] = alpha[t][i] * beta[t][i] * div;
 		}
 	}
+}
 
-	for (unsigned int t = 0; t < T-1; t++) {
+void HMM::calcDigamma(unsigned int* obs, unsigned int size, float** alpha, float** beta, float*** digamma) {
+	float seqProb = this->calcSeqProb(alpha, size);
+	float div = 1.0f / seqProb;// 1/P(O | lm)
+
+	for (unsigned int t = 0; t < size - 1; t++) {
 		for (unsigned int i = 0; i < N; i++) {
 			// float sum = 0;
 			for (unsigned int j = 0; j < N; j++) {
-				float val = this->alpha[t][i] * this->A[i][j] * this->B[obs[t]][j] * this->beta[t][j] * div;
-				this->digamma[t][i][j] = val;
+				float val = alpha[t][i] * this->A[i][j] * this->B[obs[t]][j] * beta[t][j] * div;
+				digamma[t][i][j] = val;
 				// sum += val;
 			}
 			//this->gamma[t][i] = sum;
 		} // NOTE: we could calculate gamma using digamma by taking the sum over j
+	}
+}
+
+void HMM::applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma) {
+	for (unsigned int i = 0; i < N; i++) {
+		this->Pi[i] = gamma[0][i]; // use our calculated initial probability from gamma
+	}
+
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int j = 0; j < N; j++) {
+			float digamma_sum = 0.0f;
+			float gamma_sum = 0.0f;
+			for (unsigned int t = 0; t < size-1; t++) {
+				digamma_sum += digamma[t][i][j]; // ouch, cache hurty
+				gamma_sum += gamma[t][i];
+			}
+			this->A[i][j] = digamma_sum / gamma_sum; // assign our new transition probability for Aij
+		}
+	}
+
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int k = 0; k < M; k++) {
+			float gamma_obs_sum = 0.0f;
+			float gamma_total_sum = 0.0f;
+			for (unsigned int t = 0; t < size; t++) {
+				float cur_gamma = gamma[t][i];
+				gamma_total_sum += cur_gamma;
+				if (obs[t] == i)
+					gamma_obs_sum += cur_gamma;
+			}
+
+			this->B[k][i] = gamma_obs_sum/gamma_total_sum; //re-estimate our Bik
+
+		}
 	}
 }
