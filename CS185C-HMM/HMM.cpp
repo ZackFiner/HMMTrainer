@@ -1,6 +1,7 @@
 #include "HMM.h"
 #include "ProbInit.h"
 #include "MatUtil.h"
+#include <iostream>
 
 HMM::HMM() {
 
@@ -52,34 +53,68 @@ int HMM::getStateAtT(float** gamma, unsigned int size, unsigned int t) {
 }
 
 int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
-	alphaPass(obs, size); // calculate alpha
-	betaPass(obs, size); // calculate beta
-	calcSeqProb(); // calculate P(O | lm)
-	calcGamma(obs, size); // calculate the gammas and di-gammas
+	float** alpha = alloc_mat(size, N);
+	float** beta = alloc_mat(size, N);
+	float** gamma = alloc_mat(size, N);
+	float*** digamma = alloc_mat3(size, N, N);
+	float* coeffs = alloc_vec(size);
 
-	print_matrix(gamma, T, N, true);
+
+	alphaPass(obs, size, alpha, coeffs); // calculate alpha
+	betaPass(obs, size, beta, coeffs); // calculate beta
+
+	calcGamma(obs, size, alpha, beta, gamma); // calculate the gammas and di-gammas
+	calcDigamma(obs, size, alpha, beta, digamma);
+
+	print_matrix(gamma, size, N, true);
 
 	int* r_array = new int[size];
 	for (unsigned int t = 0; t < size; t++) {
-		r_array[t] = getStateAtT(t);
+		r_array[t] = getStateAtT(gamma, size, t);
 	}
+
+	delete_array(alpha, size, N);
+	delete_array(beta, size, N);
+	delete_array(gamma, size, N);
+	delete_array3(digamma, size, N, N);
+	delete[] coeffs;
 
 	return r_array;
 }
 
-void HMM::alphaPass(unsigned int* obs, unsigned int size, float** alpha) {
-	for (unsigned int i = 0; i < N; i++)
-		alpha[0][i] = Pi[i] * B[obs[0]][i]; // B has been transposed to improve spatial locality
+void HMM::alphaPass(unsigned int* obs, unsigned int size, float** alpha, float* coeffs) {
+
+	float val;
+	coeffs[0] = 0.0f;
+	for (unsigned int i = 0; i < N; i++) {
+		val = Pi[i] * B[obs[0]][i];
+		alpha[0][i] = val; // B has been transposed to improve spatial locality
+		coeffs[0] += val;
+	}
+	
+	float div = 1.0f / coeffs[0];
+	coeffs[0] = div;
+	for (unsigned int i = 0; i < N; i++) // scale the values s.t. alpha[0][0] + alpha[0][1] + ... = 1
+		alpha[0][i] *= div;
 
 	for (unsigned int t = 1; t < size; t++) {
+		coeffs[t] = 0.0f;
 		for (unsigned int i = 0; i < N; i++) {
 			float sum = 0;
 			for (unsigned int j = 0; j < N; j++) {
 				sum += alpha[t - 1][j] * A[j][i]; // probability that we'd see the previous hidden state * the probability we'd transition to this new hidden state
 			}
-			alpha[t][i] = sum * B[obs[t]][i];
-
+			val = sum * B[obs[t]][i];
+			alpha[t][i] = val;
+			coeffs[t] += val;
+			 
 		}
+
+		div = 1.0f / coeffs[t];
+		coeffs[t] = div;
+		for (unsigned int i = 0; i < N; i++)  // scale the values s.t. alpha[t][0] + alpha[t][1] + ... = 1
+			alpha[t][i] *= div;
+
 	}
 	
 }
@@ -95,17 +130,18 @@ float HMM::calcSeqProb(float** alpha, unsigned int size) {
 	return seqProb;
 }
 
-void HMM::betaPass(unsigned int* obs, unsigned int size, float** beta) {
+void HMM::betaPass(unsigned int* obs, unsigned int size, float** beta, float* coeffs) {
 	for (unsigned int i = 0; i < N; i++)
-		beta[size - 1][i] = 1;
+		beta[size - 1][i] = coeffs[size-1];
 
 	for (int t = size-2; t >= 0; t--) {
+		float ct = coeffs[t];
 		for (unsigned int i = 0; i < N; i++) {
 			float sum = 0;
 			for (unsigned int j = 0; j < N; j++)
 				sum += A[i][j] * B[obs[t + 1]][j] * beta[t + 1][j];
 
-			beta[t][i] = sum;
+			beta[t][i] = sum*ct;
 		}
 	}
 
@@ -114,10 +150,18 @@ void HMM::betaPass(unsigned int* obs, unsigned int size, float** beta) {
 void HMM::calcGamma(unsigned int* obs, unsigned int size, float** alpha, float** beta, float** gamma) {
 	float seqProb = this->calcSeqProb(alpha, size);
 	float div = 1.0f/seqProb;// 1/P(O | lm)
+	float val;
 	for (unsigned int t = 0; t < size; t++) {
+		float scale = 1e-10f;
 		for (unsigned int i = 0; i < N; i++) {
-			gamma[t][i] = alpha[t][i] * beta[t][i] * div;
+			val = alpha[t][i] * beta[t][i] * div;
+			gamma[t][i] = val;
+			scale += val;
 		}
+
+		scale = 1.0f / scale;
+		for (unsigned int i = 0; i < N; i++)
+			gamma[t][i] *= scale;
 	}
 }
 
@@ -128,6 +172,7 @@ void HMM::calcDigamma(unsigned int* obs, unsigned int size, float** alpha, float
 	for (unsigned int t = 0; t < size - 1; t++) {
 		for (unsigned int i = 0; i < N; i++) {
 			// float sum = 0;
+			float scale = 1e-10f;
 			for (unsigned int j = 0; j < N; j++) {
 				float val = alpha[t][i] * this->A[i][j] * this->B[obs[t]][j] * beta[t][j] * div;
 				digamma[t][i][j] = val;

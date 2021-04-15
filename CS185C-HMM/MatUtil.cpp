@@ -23,11 +23,32 @@ void delete_array(float** mat, unsigned int N, unsigned int M) {
 	delete[] mat;
 }
 
+void delete_array3(float*** arr, unsigned int N, unsigned int M, unsigned int R) {
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int j = 0; j < M; j++)
+			delete[] arr[i][j];
+		delete[] arr[i];
+	}
+
+	delete[] arr;
+}
+
 float** alloc_mat(unsigned int N, unsigned int M) {
 	float** r_val = new float* [N];
 	for (unsigned int i = 0; i < N; i++)
 		r_val[i] = new float[M];
 
+	return r_val;
+}
+
+float*** alloc_mat3(unsigned int N, unsigned int M, unsigned int R) {
+	float*** r_val = new float** [N];
+	for (unsigned int i = 0; i < N; i++) {
+		r_val[i] = new float* [M];
+		for (unsigned int j = 0; j < M; j++) {
+			r_val[i][j] = new float[R];
+		}
+	}
 	return r_val;
 }
 
