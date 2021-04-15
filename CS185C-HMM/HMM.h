@@ -16,7 +16,7 @@ private:
 	void calcGamma(unsigned int* obs, unsigned int size, float** alpha, float **beta, float** gamma);
 	void calcDigamma(unsigned int* obs, unsigned int size, float** alpha, float** beta, float*** digamma);
 
-	void applyAdjust(float** gamma, float*** digamma, unsigned int size);
+	void applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma);
 
 	void calcCoeffs(float** alpha, unsigned int size);
 	float calcSeqProb(float** alpha, unsigned int size);
