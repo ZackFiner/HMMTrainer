@@ -1,6 +1,7 @@
 #include "HMM.h"
 #include "ProbInit.h"
 #include "MatUtil.h"
+#include "DataSet.h"
 
 HMM::HMM() {
 
@@ -177,6 +178,7 @@ void HMM::calcGamma(unsigned int* obs, unsigned int size, float** alpha, float**
 
 }
 
+// THIS ONLY WORKS FOR 1 SEQUENCE
 void HMM::applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma) {
 	for (unsigned int i = 0; i < N; i++) {
 		this->Pi[i] = gamma[0][i]; // use our calculated initial probability from gamma
@@ -211,7 +213,93 @@ void HMM::applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 	}
 }
 
+HMM::AdjustmentAccumulator::~AdjustmentAccumulator() {
+	delete_array(this->A_digamma_accum, N, N);
+	delete_array(this->A_gamma_accum, N, N);
+	delete_array(this->B_gamma_accum, M, N);
+	delete_array(this->B_obs_accum, M, N);
+	delete[] this->pi_accum;
+}
 
-void HMM::trainModel(const std::vector<std::vector<unsigned int>>& dataset, unsigned int iterations, unsigned int n_folds) {
+void HMM::AdjustmentAccumulator::initialize(unsigned int N, unsigned int M) {
+	this->N = N;
+	this->M = M;
 
+	this->A_digamma_accum = alloc_mat(N, N);
+	this->A_gamma_accum = alloc_mat(N, N);
+	this->B_gamma_accum = alloc_mat(M, N);
+	this->B_obs_accum = alloc_mat(M, N);
+	this->pi_accum = new float[N];
+}
+
+void HMM::AdjustmentAccumulator::reset() {
+	for (unsigned int i = 0; i < N; i++) {
+		this->pi_accum[i] = 0.0f;
+		for (unsigned int j = 0; j < N; j++) {
+			this->A_digamma_accum[i][j] = 0.0f;
+			this->A_gamma_accum[i][j] = 0.0f;
+		}
+		for (unsigned int j = 0; j < M; j++) {
+			this->B_gamma_accum[i][j] = 0.0f;
+			this->B_obs_accum[i][j] = 0.0f;
+		}
+	}
+
+}
+
+void HMM::accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma, const AdjustmentAccumulator& accum) {
+	for (unsigned int i = 0; i < N; i++) {
+		accum.pi_accum[i] += gamma[0][i]; // use our calculated initial probability from gamma
+	}
+
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int j = 0; j < N; j++) {
+			float digamma_sum = 0.0f;
+			float gamma_sum = 0.0f;
+			for (unsigned int t = 0; t < size - 1; t++) {
+				digamma_sum += digamma[t][i][j]; // ouch, cache hurty
+				gamma_sum += gamma[t][i];
+			}
+
+			accum.A_digamma_accum[i][j] += digamma_sum;
+			accum.A_gamma_accum[i][j] += gamma_sum;
+
+		}
+	}
+
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int k = 0; k < M; k++) {
+			float gamma_obs_sum = 0.0f;
+			float gamma_total_sum = 0.0f;
+			for (unsigned int t = 0; t < size; t++) {
+				float cur_gamma = gamma[t][i];
+				gamma_total_sum += cur_gamma;
+				if (obs[t] == i)
+					gamma_obs_sum += cur_gamma;
+			}
+
+			accum.B_gamma_accum[k][i] += gamma_total_sum;
+			accum.B_obs_accum[k][i] += gamma_obs_sum;
+
+		}
+	}
+}
+
+
+template<class T>
+void HMM::trainModel(const HMMDataSet<T>& dataset, unsigned int iterations, unsigned int n_folds) {
+
+	auto iter = dataset.getIter(n_folds);
+
+	for (unsigned int epoch = 0; epoch < iteartions; epoch++) {
+		do {
+			// iterate over all training examples, accumulating the adjustments and tracking log probability improvement
+			// apply the adjustments once all training examples have been processed
+
+			// iterate over the validation set, calculating the average log probability for the validation set
+			// compare the improvement in validation probability to that of train validation, if it isn't sufficient, stop iterating
+
+		} while (iter.nextFold())
+	}
+	
 }

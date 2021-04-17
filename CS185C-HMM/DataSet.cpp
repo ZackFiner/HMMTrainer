@@ -107,3 +107,101 @@ void HMMDataSet<T>::bufferData(const DataLoader<T>& loader) {
 		}
 	}
 }
+
+template<class T>
+int HMMDataSet<T>::getSize() {
+	return size;
+}
+
+template<class T>
+NFoldIterator<T> HMMDataSet<T>::getIter(unsigned int nfolds) {
+	return NFoldIterator<T>(*this, nfolds);
+}
+
+template<class T>
+NFoldIterator<T>::NFoldIterator(const HMMDataSet<T>& _loader, unsigned int _nfolds) {
+	loader = _loader;
+	nfolds = _nfolds;
+
+	int l_size = loader.getSize();
+
+	fold_size = l_size / nfolds;
+	fold_index = 0;
+
+	fold_start = loader.data;
+	fold_end = min(loader.data + fold_size, end);
+	cur_validate_ptr = loader.data;
+	cur_validate_length_ptr = loader.lengths;
+
+	
+	cur_train_ptr = loader.data + fold_size;
+	cur_train_length_ptr = loader.lengths + fold_size;
+	end = loader.data + l_size;
+	lengths_end = loader.lengths + l_size;
+
+}
+
+template<class T>
+void NFoldIterator<T>::nextTrain(unsigned int** obs, unsigned int* length) {
+	if (cur_train_ptr < end) {
+		*obs = *cur_train_ptr;
+		*length = *cur_train_length_ptr;
+
+		cur_train_ptr++;
+		cur_train_length_ptr++;
+
+		int addr = cur_train_ptr == fold_start ? fold_size : 0;
+		cur_train_ptr += addr; // skip our fold region if we need to
+		cur_train_length_ptr += addr;
+	}
+	else {
+		*obs = nullptr;
+	}
+}
+
+template<class T>
+void NFoldIterator<T>::nextValid(unsigned int** obs, unsigned int* length) {
+	if (cur_validate_ptr < fold_end) {
+		*obs = *cur_validate_ptr;
+		*length = *cur_validate_length_ptr;
+		
+		cur_validate_ptr++;
+		cur_validate_length_ptr++;
+	}
+	else {
+		*obs = nullptr;
+	}
+}
+
+template<class T>
+bool NFoldIterator<T>::nextFold() {
+	fold_index++;
+	if (fold_index > nfolds) {
+		fold_index = 0;
+
+		int l_size = loader.getSize();
+
+		fold_start = loader.data;
+		fold_end = loader.data + fold_size;
+
+		cur_validate_ptr = fold_start;
+		cur_validate_length_ptr = loader.lengths;
+
+		cur_train_ptr = fold_end;
+		cur_train_length_ptr = loader.lengths + fold_size;
+
+		return false;
+	}
+	else {
+		fold_start += fold_size;
+		fold_end = min(fold_end + fold_size, end);
+
+		cur_validate_ptr += fold_size;
+		cur_validate_length_ptr += fold_size;
+
+		cur_train_ptr = loader.data;
+		cur_train_length_ptr = loader.lengths;
+
+		return true;
+	}
+}
