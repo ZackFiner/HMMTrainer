@@ -1,5 +1,7 @@
-#include <iostream>
-#include <string>
+#include "MatUtil.h"
+#include "DataSet.h"
+#include <fstream>
+#include <unordered_map>
 
 float** transpose(float** mat, unsigned int N, unsigned int M) {
 	// NxM -> MxN
@@ -116,4 +118,19 @@ void print_matrix(float** mat, unsigned int N, unsigned int M, bool transpose) {
 	}
 	std::cout << std::endl;
 
+}
+
+DataMapper<std::string> generateDataMapFromStats(const std::string& fpath, unsigned int symbolcount) {
+	std::ifstream file(fpath);
+	std::unordered_map<std::string, unsigned int> mapper;
+	std::string cur;
+	unsigned int i = 0;
+	while (std::getline(file, cur) && i < symbolcount) {
+		std::string opcode = cur.substr(cur.find(','));
+		mapper[opcode] = i;
+		i++;
+	}
+
+	DataMapper<std::string> r_val = DataMapper<std::string>(mapper);
+	return r_val;
 }
