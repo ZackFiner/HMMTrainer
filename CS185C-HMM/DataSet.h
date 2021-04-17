@@ -47,11 +47,13 @@ public:
 	~HMMDataSet();
 	NFoldIterator<T> getIter(unsigned int nfolds);
 	int getSize();
+	unsigned int getMaxLength();
 private:
 	void bufferData(const DataLoader<T>& loader);
 	DataMapper<T> symbol_map;
 	unsigned int** data; // raw 2d array of byte sequences
 	unsigned int* lengths; // array of record lengths
+	unsigned int max_length; // i don't want to re-allocate every time i load a new example
 	int size;
 	friend class NFoldIterator<T>;
 };

@@ -95,11 +95,14 @@ void HMMDataSet<T>::bufferData(const DataLoader<T>& loader) {
 	size = cache.size();
 	data = new unsigned int* [size];
 	lengths = new unsigned int[size];
+	max_length = 0;
 	for (unsigned int i = 0; i < size; i++) {
 		std::vector<T>& record = cache[i];
 		
 		unsigned int record_size = record.size();
 		lengths[i] = record_size;
+		if (record_size > max_length)
+			max_length = record_size;
 
 		data[i] = new unsigned int[record_size];
 		for (unsigned int j = 0; j < record_size; j++) {
@@ -111,6 +114,11 @@ void HMMDataSet<T>::bufferData(const DataLoader<T>& loader) {
 template<class T>
 int HMMDataSet<T>::getSize() {
 	return size;
+}
+
+template<class T>
+unsigned int HMMDataSet<T>::getMaxLength() {
+	return max_length;
 }
 
 template<class T>
@@ -137,7 +145,6 @@ NFoldIterator<T>::NFoldIterator(const HMMDataSet<T>& _loader, unsigned int _nfol
 	cur_train_ptr = loader.data + fold_size;
 	cur_train_length_ptr = loader.lengths + fold_size;
 	end = loader.data + l_size;
-	lengths_end = loader.lengths + l_size;
 
 }
 
@@ -194,7 +201,7 @@ bool NFoldIterator<T>::nextFold() {
 	}
 	else {
 		fold_start += fold_size;
-		fold_end = min(fold_end + fold_size, end);
+		fold_end = std::min(fold_end + fold_size, end);
 
 		cur_validate_ptr += fold_size;
 		cur_validate_length_ptr += fold_size;
@@ -205,3 +212,7 @@ bool NFoldIterator<T>::nextFold() {
 		return true;
 	}
 }
+
+// NOTE TO SELF: if you are getting ugly linker errors related to template classes
+// you need to add a line like this to the bottom of your .cpp file
+template class DataMapper<std::string>; // see this link for a better explanation: https://isocpp.org/wiki/faq/templates#separate-template-class-defn-from-decl 

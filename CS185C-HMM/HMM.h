@@ -19,7 +19,7 @@ private:
 		float** B_gamma_accum;
 		float** B_obs_accum;
 		float* pi_accum;
-		unsigned int N, M;
+		unsigned int N, M, count;
 		void initialize(unsigned int N, unsigned int M);
 		void reset();
 		~AdjustmentAccumulator();
@@ -31,7 +31,8 @@ private:
 	void calcGamma(unsigned int* obs, unsigned int size, float** alpha, float **beta, float** gamma, float*** digamma);
 
 	void applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma);
-	void accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma, const AdjustmentAccumulator& accum);
+	void applyAdjust(const AdjustmentAccumulator& accum);
+	void accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma, AdjustmentAccumulator& accum);
 	float calcSeqProb(float** alpha, unsigned int size);
 
 

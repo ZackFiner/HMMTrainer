@@ -213,6 +213,25 @@ void HMM::applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 	}
 }
 
+void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
+	float div = 1.0f / accum.count;
+	for (unsigned int i = 0; i < N; i++) {
+		this->Pi[i] = accum.pi_accum[i]*div; // use our calculated initial probability from gamma
+	}
+
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int j = 0; j < N; j++) {
+			this->A[i][j] = accum.A_digamma_accum[i][j] / accum.A_gamma_accum[i][j];// assign our new transition probability for Aij
+		}
+	}
+
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int k = 0; k < M; k++) {
+			this->B[k][i] = accum.B_obs_accum[k][i] / accum.B_gamma_accum[k][i]; //re-estimate our Bik
+		}
+	}
+}
+
 HMM::AdjustmentAccumulator::~AdjustmentAccumulator() {
 	delete_array(this->A_digamma_accum, N, N);
 	delete_array(this->A_gamma_accum, N, N);
@@ -244,10 +263,11 @@ void HMM::AdjustmentAccumulator::reset() {
 			this->B_obs_accum[i][j] = 0.0f;
 		}
 	}
+	this->count = 0;
 
 }
 
-void HMM::accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma, const AdjustmentAccumulator& accum) {
+void HMM::accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma, AdjustmentAccumulator& accum) {
 	for (unsigned int i = 0; i < N; i++) {
 		accum.pi_accum[i] += gamma[0][i]; // use our calculated initial probability from gamma
 	}
@@ -283,6 +303,7 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 
 		}
 	}
+	accum.count += 1;
 }
 
 
@@ -290,16 +311,41 @@ template<class T>
 void HMM::trainModel(const HMMDataSet<T>& dataset, unsigned int iterations, unsigned int n_folds) {
 
 	auto iter = dataset.getIter(n_folds);
+	AdjustmentAccumulator accum;
+	accum.initialize(N, M);
+	unsigned int max_length = dataset.getMaxLength();
+	float** alpha = alloc_mat(max_length, N); // allocate enough space for the largest observation sequence
+	float** beta = alloc_mat(max_length, N);
+	float** gamma = alloc_mat(max_length, N);
+	float*** digamma = alloc_mat3(max_length, N, N);
+	float* coeffs = alloc_vec(max_length);
 
-	for (unsigned int epoch = 0; epoch < iteartions; epoch++) {
+	for (unsigned int epoch = 0; epoch < iterations; epoch++) {
 		do {
+			accum.reset();
+			unsigned int* obs;
+			unsigned int length;
+
+			iter.nextTrain(&obs, &length);
+			while (obs) {
+				alphaPass(obs, length, alpha, coeffs);
+				betaPass(obs, length, beta, coeffs); // calculate beta
+
+				calcGamma(obs, length, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
+				accumAdjust(obs, length, gamma, digamma, accum); // add our adjustments to the accumulator
+
+				iter.nextTrain(&obs, &length);
+			}
+
+			applyAdjust(accum); // make the adjustments to the weights
+			accum.reset();
 			// iterate over all training examples, accumulating the adjustments and tracking log probability improvement
 			// apply the adjustments once all training examples have been processed
 
 			// iterate over the validation set, calculating the average log probability for the validation set
 			// compare the improvement in validation probability to that of train validation, if it isn't sufficient, stop iterating
 
-		} while (iter.nextFold())
+		} while (iter.nextFold());
 	}
 	
 }
