@@ -120,7 +120,7 @@ void print_matrix(float** mat, unsigned int N, unsigned int M, bool transpose) {
 
 }
 
-DataMapper<std::string> generateDataMapFromStats(const std::string& fpath, unsigned int symbolcount) {
+DataMapper generateDataMapFromStats(const std::string& fpath, unsigned int symbolcount) {
 	std::ifstream file(fpath);
 	std::unordered_map<std::string, unsigned int> mapper;
 	std::string cur;
@@ -131,6 +131,6 @@ DataMapper<std::string> generateDataMapFromStats(const std::string& fpath, unsig
 		i++;
 	}
 
-	DataMapper<std::string> r_val = DataMapper<std::string>(mapper);
+	DataMapper r_val = DataMapper(mapper);
 	return r_val;
 }

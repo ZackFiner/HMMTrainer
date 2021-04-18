@@ -3,40 +3,34 @@
 
 namespace std_fs = std::filesystem;
 
-template<class T>
-DataMapper<T>::DataMapper():
+DataMapper::DataMapper():
 	size(0)
 {}
 
-template<class T>
-DataMapper<T>::DataMapper(const std::unordered_map<T, unsigned int>& mapper):
+DataMapper::DataMapper(const std::unordered_map<std::string, unsigned int>& mapper):
 	raw_mapper(mapper)
 {
 	size = mapper.size();
 }
 
-template<class T>
-DataMapper<T>::DataMapper(const DataMapper<T>& o):
+DataMapper::DataMapper(const DataMapper& o):
 	raw_mapper(o.raw_mapper),
 	size(o.size)
 {}
 
-template<class T>
-unsigned int DataMapper<T>::getVal(const T& v)
+unsigned int DataMapper::getVal(const std::string& v) const
 {
 	auto loc = this->raw_mapper.find(v);
 	return loc != raw_mapper.end() ? loc->second : size;
 }
 
-template<>
-NewLineSeperatedLoader<std::string>::NewLineSeperatedLoader(std::string _fpath):
+NewLineSeperatedLoader::NewLineSeperatedLoader(std::string _fpath):
 	fpath(_fpath),
 	file_iterator(_fpath),
 	end()
 {}
 
-template<>
-std::vector<std::string> NewLineSeperatedLoader<std::string>::nextRecord() {
+std::vector<std::string> NewLineSeperatedLoader::nextRecord() {
 	// read all lines from the file and return it
 	auto& cur_file = *(this->file_iterator);
 	std::vector<std::string> r_val;
@@ -55,22 +49,19 @@ std::vector<std::string> NewLineSeperatedLoader<std::string>::nextRecord() {
 	return r_val;
 }
 
-template<>
-bool NewLineSeperatedLoader<std::string>::hasNext() {
+bool NewLineSeperatedLoader::hasNext() {
 	// determine whether we are done reading files
 	return this->file_iterator != end;
 }
 
-
-template<class T>
-HMMDataSet<T>::HMMDataSet(): 
+HMMDataSet::HMMDataSet(): 
 	data(nullptr), 
-	size(0) 
+	size(0),
+	max_length(0)
 {
 }
 
-template<class T>
-HMMDataSet<T>::HMMDataSet(const DataLoader<T>& loader, const DataMapper<T>& mapper) :
+HMMDataSet::HMMDataSet(DataLoader* loader, const DataMapper& mapper) :
 	symbol_map(mapper),// use deep copy constructor to initialize
 	data(nullptr),
 	size(0)
@@ -78,26 +69,24 @@ HMMDataSet<T>::HMMDataSet(const DataLoader<T>& loader, const DataMapper<T>& mapp
 	bufferData(loader);
 }
 
-template<class T>
-HMMDataSet<T>::~HMMDataSet() {
+HMMDataSet::~HMMDataSet() {
 	for (unsigned int i = 0; i < size; i++) {
 		delete[] data[i];
 	}
 	delete[] data;
 }
 
-template<class T>
-void HMMDataSet<T>::bufferData(const DataLoader<T>& loader) {
-	std::vector<std::vector<T>> cache;
-	while (loader.hasNext()) {
-		cache.push_back(loader.nextRecord());
+void HMMDataSet::bufferData(DataLoader* loader) {
+	std::vector<std::vector<std::string>> cache;
+	while (loader->hasNext()) {
+		cache.push_back(loader->nextRecord());
 	}
 	size = cache.size();
 	data = new unsigned int* [size];
 	lengths = new unsigned int[size];
 	max_length = 0;
 	for (unsigned int i = 0; i < size; i++) {
-		std::vector<T>& record = cache[i];
+		std::vector<std::string>& record = cache[i];
 		
 		unsigned int record_size = record.size();
 		lengths[i] = record_size;
@@ -111,24 +100,20 @@ void HMMDataSet<T>::bufferData(const DataLoader<T>& loader) {
 	}
 }
 
-template<class T>
-int HMMDataSet<T>::getSize() {
+int HMMDataSet::getSize() const {
 	return size;
 }
 
-template<class T>
-unsigned int HMMDataSet<T>::getMaxLength() {
+unsigned int HMMDataSet::getMaxLength() const {
 	return max_length;
 }
 
-template<class T>
-NFoldIterator<T> HMMDataSet<T>::getIter(unsigned int nfolds) {
-	return NFoldIterator<T>(*this, nfolds);
+
+NFoldIterator HMMDataSet::getIter(unsigned int nfolds) const {
+	return NFoldIterator(*this, nfolds);
 }
 
-template<class T>
-NFoldIterator<T>::NFoldIterator(const HMMDataSet<T>& _loader, unsigned int _nfolds) {
-	loader = _loader;
+NFoldIterator::NFoldIterator(const HMMDataSet& _loader, unsigned int _nfolds): loader(_loader) {
 	nfolds = _nfolds;
 
 	int l_size = loader.getSize();
@@ -137,7 +122,7 @@ NFoldIterator<T>::NFoldIterator(const HMMDataSet<T>& _loader, unsigned int _nfol
 	fold_index = 0;
 
 	fold_start = loader.data;
-	fold_end = min(loader.data + fold_size, end);
+	fold_end = std::min(loader.data + fold_size, end);
 	cur_validate_ptr = loader.data;
 	cur_validate_length_ptr = loader.lengths;
 
@@ -148,8 +133,7 @@ NFoldIterator<T>::NFoldIterator(const HMMDataSet<T>& _loader, unsigned int _nfol
 
 }
 
-template<class T>
-void NFoldIterator<T>::nextTrain(unsigned int** obs, unsigned int* length) {
+void NFoldIterator::nextTrain(unsigned int** obs, unsigned int* length) {
 	if (cur_train_ptr < end) {
 		*obs = *cur_train_ptr;
 		*length = *cur_train_length_ptr;
@@ -166,8 +150,7 @@ void NFoldIterator<T>::nextTrain(unsigned int** obs, unsigned int* length) {
 	}
 }
 
-template<class T>
-void NFoldIterator<T>::nextValid(unsigned int** obs, unsigned int* length) {
+void NFoldIterator::nextValid(unsigned int** obs, unsigned int* length) {
 	if (cur_validate_ptr < fold_end) {
 		*obs = *cur_validate_ptr;
 		*length = *cur_validate_length_ptr;
@@ -180,8 +163,7 @@ void NFoldIterator<T>::nextValid(unsigned int** obs, unsigned int* length) {
 	}
 }
 
-template<class T>
-bool NFoldIterator<T>::nextFold() {
+bool NFoldIterator::nextFold() {
 	fold_index++;
 	if (fold_index > nfolds) {
 		fold_index = 0;
@@ -212,7 +194,3 @@ bool NFoldIterator<T>::nextFold() {
 		return true;
 	}
 }
-
-// NOTE TO SELF: if you are getting ugly linker errors related to template classes
-// you need to add a line like this to the bottom of your .cpp file
-template class DataMapper<std::string>; // see this link for a better explanation: https://isocpp.org/wiki/faq/templates#separate-template-class-defn-from-decl 

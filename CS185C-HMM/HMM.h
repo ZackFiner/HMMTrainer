@@ -1,7 +1,9 @@
 #pragma once
 #include <vector>
-template<class T> class HMMDataSet;
+#include <string>
+class HMMDataSet;
 class ProbInit;
+
 class HMM
 {
 public:
@@ -10,8 +12,7 @@ public:
 	HMM(unsigned int _N, unsigned int _M, ProbInit* initializer = nullptr);
 	~HMM();
 	int* getIdealStateSequence(unsigned int* obs, unsigned int size);
-	template<class T>
-	void trainModel(const HMMDataSet<T>& dataset, unsigned int iterations = 10, unsigned int n_folds = 10);
+	void trainModel(const HMMDataSet& dataset, unsigned int iterations = 10, unsigned int n_folds = 10);
 private:
 	struct AdjustmentAccumulator {
 		float** A_gamma_accum;
@@ -41,4 +42,3 @@ private:
 	unsigned int N, M;
 
 };
-

@@ -4,30 +4,29 @@
 #include <fstream>
 #include <filesystem>
 
-template <class T>
 class DataMapper {
 public:
 	DataMapper();
-	DataMapper(const std::unordered_map<T, unsigned int>& mapper);
-	DataMapper(const DataMapper<T>& o);
-	unsigned int getVal(const T& v);
+	DataMapper(const std::unordered_map<std::string, unsigned int>& mapper);
+	DataMapper(const DataMapper& o);
+	unsigned int getVal(const std::string& v) const;
 private:
-	std::unordered_map<T, unsigned int> raw_mapper; // this should be 1:1 for now
+	std::unordered_map<std::string, unsigned int> raw_mapper; // this should be 1:1 for now
 	unsigned int size;
 };
 
-template <class T>
+
 class DataLoader {
 public:
-	virtual std::vector<T> nextRecord() = 0;
+	virtual std::vector<std::string> nextRecord() = 0;
 	virtual bool hasNext() = 0;
 };
 
-template <class T>
-class NewLineSeperatedLoader : public DataLoader<T> {
+
+class NewLineSeperatedLoader : public DataLoader {
 public:
 	NewLineSeperatedLoader(std::string _fpath);
-	std::vector<T> nextRecord();
+	std::vector<std::string> nextRecord();
 	bool hasNext();
 private:
 	std::string fpath;
@@ -36,37 +35,35 @@ private:
 	unsigned int cur = 0;
 };
 
-template<class T> class NFoldIterator;
+class NFoldIterator;
 
-template <class T>
 class HMMDataSet
 {
 public:
 	HMMDataSet();
-	HMMDataSet(const DataLoader<T>& loader, const DataMapper<T>& mapper);
+	HMMDataSet(DataLoader* loader, const DataMapper& mapper);
 	~HMMDataSet();
-	NFoldIterator<T> getIter(unsigned int nfolds);
-	int getSize();
-	unsigned int getMaxLength();
+	NFoldIterator getIter(unsigned int nfolds) const;
+	int getSize() const;
+	unsigned int getMaxLength() const;
 private:
-	void bufferData(const DataLoader<T>& loader);
-	DataMapper<T> symbol_map;
+	void bufferData(DataLoader* loader);
+	DataMapper symbol_map;
 	unsigned int** data; // raw 2d array of byte sequences
 	unsigned int* lengths; // array of record lengths
 	unsigned int max_length; // i don't want to re-allocate every time i load a new example
 	int size;
-	friend class NFoldIterator<T>;
+	friend class NFoldIterator;
 };
 
-template <class T>
 class NFoldIterator {
 public:
-	NFoldIterator(const HMMDataSet<T>& _loader, unsigned int _nfolds);
+	NFoldIterator(const HMMDataSet& _loader, unsigned int _nfolds);
 	void nextTrain(unsigned int** obs, unsigned int* length);
 	void nextValid(unsigned int** obs, unsigned int* length);
 	bool nextFold();
 private:
-	const DataLoader<T>& loader;
+	const HMMDataSet& loader;
 	unsigned int nfolds;
 	unsigned int fold_index;
 	unsigned int fold_size;

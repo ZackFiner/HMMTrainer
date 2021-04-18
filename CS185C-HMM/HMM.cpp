@@ -2,6 +2,7 @@
 #include "ProbInit.h"
 #include "MatUtil.h"
 #include "DataSet.h"
+#include <math.h>
 
 HMM::HMM() {
 
@@ -306,11 +307,9 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 	accum.count += 1;
 }
 
+void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigned int n_folds) {
 
-template<class T>
-void HMM::trainModel(const HMMDataSet<T>& dataset, unsigned int iterations, unsigned int n_folds) {
-
-	auto iter = dataset.getIter(n_folds);
+	NFoldIterator iter = dataset.getIter(n_folds);
 	AdjustmentAccumulator accum;
 	accum.initialize(N, M);
 	unsigned int max_length = dataset.getMaxLength();
@@ -320,12 +319,15 @@ void HMM::trainModel(const HMMDataSet<T>& dataset, unsigned int iterations, unsi
 	float*** digamma = alloc_mat3(max_length, N, N);
 	float* coeffs = alloc_vec(max_length);
 
+	float avgTrainLogProb = -1e11f, avgValidLogProb = -1e11f;
+	float old_valid_score = -1e11f, old_train_score = -1e11f;
+
 	for (unsigned int epoch = 0; epoch < iterations; epoch++) {
 		do {
 			accum.reset();
 			unsigned int* obs;
 			unsigned int length;
-
+			avgTrainLogProb = 0.0f;
 			iter.nextTrain(&obs, &length);
 			while (obs) {
 				alphaPass(obs, length, alpha, coeffs);
@@ -334,18 +336,39 @@ void HMM::trainModel(const HMMDataSet<T>& dataset, unsigned int iterations, unsi
 				calcGamma(obs, length, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
 				accumAdjust(obs, length, gamma, digamma, accum); // add our adjustments to the accumulator
 
+				for (unsigned int i = 0; i < length; i++)
+					avgTrainLogProb -= log(coeffs[i]);
+
 				iter.nextTrain(&obs, &length);
 			}
+			avgTrainLogProb /= (float)accum.count + 1e-10f;
+
+			avgValidLogProb = 0.0f;
+			unsigned int validation_count = 0;
+			iter.nextValid(&obs, &length);
+			while (obs) {
+				alphaPass(obs, length, alpha, coeffs);
+				for (unsigned int i = 0; i < length; i++)
+					avgValidLogProb -= log(coeffs[i]);
+
+				validation_count++;
+				iter.nextValid(&obs, &length);
+			}
+			avgValidLogProb /= (float)validation_count + 1e-10f;
+			if (old_valid_score >= avgValidLogProb) // stop when our vaidation score decreases
+				return;
+
+			old_valid_score = avgValidLogProb;
+			old_train_score = avgTrainLogProb;
 
 			applyAdjust(accum); // make the adjustments to the weights
 			accum.reset();
-			// iterate over all training examples, accumulating the adjustments and tracking log probability improvement
-			// apply the adjustments once all training examples have been processed
 
-			// iterate over the validation set, calculating the average log probability for the validation set
-			// compare the improvement in validation probability to that of train validation, if it isn't sufficient, stop iterating
-
+			std::cout << avgValidLogProb << std::endl;
+		
 		} while (iter.nextFold());
+		std::cout << avgValidLogProb << std::endl;
 	}
-	
+	std::cout << avgValidLogProb << std::endl;
 }
+
