@@ -216,9 +216,8 @@ void HMM::applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 }
 
 void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
-	float div = 1.0f / accum.count;
 	for (unsigned int i = 0; i < N; i++) {
-		this->Pi[i] = accum.pi_accum[i]*div; // use our calculated initial probability from gamma
+		this->Pi[i] = accum.pi_accum[i]; // use our calculated initial probability from gamma
 	}
 
 	for (unsigned int i = 0; i < N; i++) {
@@ -240,20 +239,25 @@ HMM::AdjustmentAccumulator::~AdjustmentAccumulator() {
 	delete_array(this->B_gamma_accum, M, N);
 	delete_array(this->B_obs_accum, M, N);
 	delete[] this->pi_accum;
+	this->initialized = false;
 }
 
 void HMM::AdjustmentAccumulator::initialize(unsigned int N, unsigned int M) {
 	this->N = N;
 	this->M = M;
-
+	this->accumLogProb = 0.0f;
+	this->accumLogProb_v = 0.0f;
 	this->A_digamma_accum = alloc_mat(N, N);
 	this->A_gamma_accum = alloc_mat(N, N);
 	this->B_gamma_accum = alloc_mat(M, N);
 	this->B_obs_accum = alloc_mat(M, N);
 	this->pi_accum = new float[N];
+	this->initialized = true;
 }
 
 void HMM::AdjustmentAccumulator::reset() {
+	if (!initialized)
+		std::cout << "ERROR, attempting to reset an accumulator before it has been initialized" << std::endl;
 	for (unsigned int i = 0; i < N; i++) {
 		this->pi_accum[i] = 0.0f;
 		for (unsigned int j = 0; j < N; j++) {
@@ -261,8 +265,8 @@ void HMM::AdjustmentAccumulator::reset() {
 			this->A_gamma_accum[i][j] = 0.0f;
 		}
 		for (unsigned int j = 0; j < M; j++) {
-			this->B_gamma_accum[i][j] = 0.0f;
-			this->B_obs_accum[i][j] = 0.0f;
+			this->B_gamma_accum[j][i] = 0.0f;
+			this->B_obs_accum[j][i] = 0.0f;
 		}
 	}
 	this->accumLogProb = 0.0f;
@@ -316,70 +320,26 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 	AdjustmentAccumulator accum;
 	accum.initialize(N, M);
 	unsigned int max_length = dataset.getMaxLength();
-	float** alpha = alloc_mat(max_length, N); // allocate enough space for the largest observation sequence
-	float** beta = alloc_mat(max_length, N);
-	float** gamma = alloc_mat(max_length, N);
-	float*** digamma = alloc_mat3(max_length, N, N);
-	float* coeffs = alloc_vec(max_length);
+	
+	NFoldTrainingManager trainer;
+	trainer.data = dataset.getDataPtr();
+	trainer.lengths = dataset.getLengthsPtr();
+	trainer.case_count = dataset.getSize();
 
-	float avgTrainLogProb = -1e11f, avgValidLogProb = -1e11f;
-	float old_valid_score = -1e11f, old_train_score = -1e11f;
+
+	trainer.multi_thread_fold(n_folds, N, M, this, max_length);
 
 	for (unsigned int epoch = 0; epoch < iterations; epoch++) {
-		do {
-			accum.reset();
-			unsigned int* obs;
-			unsigned int length;
-			avgTrainLogProb = 0.0f;
-			iter.nextTrain(&obs, &length);
-			while (obs) {
-				alphaPass(obs, length, alpha, coeffs);
-				betaPass(obs, length, beta, coeffs); // calculate beta
+		for (unsigned int i = 0; i < n_folds; i++) {
+			trainer.train_fold(i, &accum);
 
-				calcGamma(obs, length, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
-				accumAdjust(obs, length, gamma, digamma, accum); // add our adjustments to the accumulator
+			std::cout << accum.accumLogProb << std::endl;
+			std::cout << accum.accumLogProb_v << std::endl;
+			applyAdjust(accum);
+		}
 
-				for (unsigned int i = 0; i < length; i++)
-					avgTrainLogProb -= log(coeffs[i]);
-
-				iter.nextTrain(&obs, &length);
-			}
-			avgTrainLogProb /= (float)accum.count + 1e-10f;
-
-			avgValidLogProb = 0.0f;
-			unsigned int validation_count = 0;
-			iter.nextValid(&obs, &length);
-			while (obs) {
-				alphaPass(obs, length, alpha, coeffs);
-				for (unsigned int i = 0; i < length; i++)
-					avgValidLogProb -= log(coeffs[i]);
-
-				validation_count++;
-				iter.nextValid(&obs, &length);
-			}
-			std::cout << validation_count << std::endl;
-			avgValidLogProb /= (float)validation_count + 1e-10f;
-			if (old_valid_score >= avgValidLogProb) // stop when our vaidation score decreases
-				return;
-
-			old_valid_score = avgValidLogProb;
-			old_train_score = avgTrainLogProb;
-
-			applyAdjust(accum); // make the adjustments to the weights
-			accum.reset();
-
-			std::cout << "fold average validation log probability: " << avgValidLogProb << std::endl;
-		
-		} while (iter.nextFold());
-		std::cout << avgValidLogProb << std::endl;
 	}
-	std::cout << avgValidLogProb << std::endl;
-
-	delete_array(alpha, max_length, N); // allocate enough space for the largest observation sequence
-	delete_array(beta, max_length, N);
-	delete_array(gamma, max_length, N);
-	delete_array3(digamma, max_length, N, N);
-	delete[] coeffs;
+	std::cout << accum.accumLogProb_v << std::endl;
 }
 
 void HMM::NFoldTrainingManager::multi_thread_fold(unsigned int nfold, unsigned int _N, unsigned int _M, HMM* _hmm, unsigned int max_sequence_length) {
@@ -389,6 +349,7 @@ void HMM::NFoldTrainingManager::multi_thread_fold(unsigned int nfold, unsigned i
 	N = _N;
 	M = _M;
 	hmm = _hmm;
+	fold_count = nfold;
 	unsigned int fold_size = case_count / nfold;
 	unsigned int** cur_region = data;
 	unsigned int* cur_lengths = lengths;
@@ -413,12 +374,12 @@ void HMM::NFoldTrainingManager::multi_thread_fold(unsigned int nfold, unsigned i
 	fold_regions.push_back(cur_region);
 	fold_region_lengths.push_back(cur_lengths);
 	fold_region_sizes.push_back(case_count - case_accum);
-
+	
 	accumulators = new AdjustmentAccumulator[nfold];
-
+	workers = new TrainingWorker[nfold];
 	for (unsigned int i = 0; i < fold_regions.size(); i++) {
 		accumulators[i].initialize(N, M);
-		workers.emplace_back(TrainingWorker(
+		workers[i].initialize(
 			fold_regions[i],
 			fold_region_lengths[i],
 			fold_region_sizes[i],
@@ -426,18 +387,19 @@ void HMM::NFoldTrainingManager::multi_thread_fold(unsigned int nfold, unsigned i
 			N,
 			M,
 			hmm,
-			&accumulators[i]
-			));
+			(accumulators+i)
+			);
 	}
 }
 
 HMM::NFoldTrainingManager::~NFoldTrainingManager() {
 	delete[] accumulators;
+	delete[] workers;
 }
 
 void HMM::NFoldTrainingManager::train_fold(unsigned int fold_index, AdjustmentAccumulator* master) {
 	std::vector<std::thread> threads;
-	for (unsigned int i = 0; i < workers.size(); i++) {
+	for (unsigned int i = 0; i < fold_count; i++) {
 		accumulators[i].reset();
 		if (i != fold_index) {
 			threads.emplace_back(std::thread(&(HMM::TrainingWorker::train_work), (HMM::TrainingWorker*)&workers[i]));
@@ -451,37 +413,35 @@ void HMM::NFoldTrainingManager::train_fold(unsigned int fold_index, AdjustmentAc
 		th.join();
 	}
 
+	float div = 1.0f / (float)(case_count-accumulators[fold_index].count);
 	// combine all acumulations in the master accumulator
 	master->reset();
-	for (unsigned int i = 0; i < workers.size(); i++) {
+	for (unsigned int i = 0; i < fold_count; i++) {
 		AdjustmentAccumulator* cur = &accumulators[i];
 		
 		if (i != fold_index) {
 			master->count += cur->count;
-			master->accumLogProb -= cur->accumLogProb;
+			master->accumLogProb -= cur->accumLogProb*div;
 			for (unsigned int i = 0; i < N; i++) {
-				master->pi_accum[i] += cur->pi_accum[i];
+				master->pi_accum[i] += cur->pi_accum[i]*div;
 				for (unsigned int j = 0; j < N; j++) {
-					master->A_digamma_accum[i][j] += cur->A_digamma_accum[i][j];
-					master->A_gamma_accum[i][j] += cur->A_gamma_accum[i][j];
+					master->A_digamma_accum[i][j] += cur->A_digamma_accum[i][j]*div;
+					master->A_gamma_accum[i][j] += cur->A_gamma_accum[i][j]*div;
 				}
 
 				for (unsigned int j = 0; j < M; j++) {
-					master->B_gamma_accum[j][i] += cur->B_gamma_accum[j][i];
-					master->B_obs_accum[j][i] += cur->B_obs_accum[j][i];
+					master->B_gamma_accum[j][i] += cur->B_gamma_accum[j][i]*div;
+					master->B_obs_accum[j][i] += cur->B_obs_accum[j][i]*div;
 				}
 			}
 		}
 		else {
-			master->accumLogProb_v -= cur->accumLogProb_v;
-			master->accumLogProb_v /= (float)cur->count + 1e-6f;
+			master->accumLogProb_v = cur->accumLogProb_v / ((float)cur->count + 1e-6f);
 		}
 	}
-
-	master->accumLogProb /= (float)master->count + 1e-6f;
 }
 
-HMM::TrainingWorker::TrainingWorker(
+void HMM::TrainingWorker::initialize(
 	unsigned int** _case_data,
 	unsigned int* _case_lengths,
 	unsigned int _case_count,
@@ -493,7 +453,7 @@ HMM::TrainingWorker::TrainingWorker(
 ) {
 	case_data = _case_data;
 	case_lengths = _case_lengths;
-	case_count = case_count;
+	case_count = _case_count;
 	sequence_count = _sequence_count;
 	N = _N;
 	M = _M;
@@ -512,7 +472,8 @@ HMM::TrainingWorker::~TrainingWorker() {
 	delete_array(beta, sequence_count, N);
 	delete_array(gamma, sequence_count, N);
 	delete_array3(digamma, sequence_count, N, N);
-	delete[] coeffs;
+	if (coeffs)
+		delete[] coeffs;
 }
 
 void HMM::TrainingWorker::train_work() {
@@ -535,8 +496,10 @@ void HMM::TrainingWorker::valid_work() {
 		unsigned int* obs = case_data[i];
 		unsigned int length = case_lengths[i];
 		hmm->alphaPass(obs, length, alpha, coeffs);
-
+		
 		for (unsigned int i = 0; i < length; i++)
 			accumulator->accumLogProb_v -= log(coeffs[i]);
+
+		accumulator->count++;
 	}
 }

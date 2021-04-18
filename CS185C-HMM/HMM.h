@@ -25,11 +25,12 @@ private:
 		float accumLogProb_v;
 		void initialize(unsigned int N, unsigned int M);
 		void reset();
+		bool initialized = false;
 		~AdjustmentAccumulator();
 
 	};
 	struct TrainingWorker {
-		TrainingWorker(
+		void initialize(
 			unsigned int** _case_data,
 			unsigned int* _case_lengths,
 			unsigned int _case_count,
@@ -44,7 +45,7 @@ private:
 		unsigned int* case_lengths;
 		unsigned int case_count;
 
-		float *coeffs, **alpha, **beta, **gamma, *** digamma;
+		float *coeffs=nullptr, **alpha=nullptr, **beta=nullptr, **gamma=nullptr, *** digamma=nullptr;
 		unsigned int sequence_count, N, M;
 
 		HMM* hmm;
@@ -61,8 +62,9 @@ private:
 		unsigned int case_count;
 		unsigned int N;
 		unsigned int M;
+		unsigned int fold_count;
 		HMM* hmm;
-		std::vector<TrainingWorker> workers;
+		TrainingWorker* workers;
 		void multi_thread_fold(unsigned int nfold, unsigned int _N, unsigned int _M, HMM* _hmm, unsigned int max_sequence_length);
 		void train_fold(unsigned int fold_index, AdjustmentAccumulator* master);
 		~NFoldTrainingManager();

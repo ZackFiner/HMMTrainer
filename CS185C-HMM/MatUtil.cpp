@@ -18,6 +18,9 @@ float** transpose(float** mat, unsigned int N, unsigned int M) {
 }
 
 void delete_array(float** mat, unsigned int N, unsigned int M) {
+	if (!mat)
+		return;
+
 	for (unsigned int i = 0; i < N; i++) {
 		delete[] mat[i];
 	}
@@ -26,6 +29,9 @@ void delete_array(float** mat, unsigned int N, unsigned int M) {
 }
 
 void delete_array3(float*** arr, unsigned int N, unsigned int M, unsigned int R) {
+	if (!arr)
+		return;
+
 	for (unsigned int i = 0; i < N; i++) {
 		for (unsigned int j = 0; j < M; j++)
 			delete[] arr[i][j];
