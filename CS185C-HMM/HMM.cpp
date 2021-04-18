@@ -3,6 +3,7 @@
 #include "MatUtil.h"
 #include "DataSet.h"
 #include <math.h>
+#include <thread>
 
 HMM::HMM() {
 
@@ -264,6 +265,8 @@ void HMM::AdjustmentAccumulator::reset() {
 			this->B_obs_accum[i][j] = 0.0f;
 		}
 	}
+	this->accumLogProb = 0.0f;
+	this->accumLogProb_v = 0.0f;
 	this->count = 0;
 
 }
@@ -354,6 +357,7 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 				validation_count++;
 				iter.nextValid(&obs, &length);
 			}
+			std::cout << validation_count << std::endl;
 			avgValidLogProb /= (float)validation_count + 1e-10f;
 			if (old_valid_score >= avgValidLogProb) // stop when our vaidation score decreases
 				return;
@@ -364,11 +368,175 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 			applyAdjust(accum); // make the adjustments to the weights
 			accum.reset();
 
-			std::cout << avgValidLogProb << std::endl;
+			std::cout << "fold average validation log probability: " << avgValidLogProb << std::endl;
 		
 		} while (iter.nextFold());
 		std::cout << avgValidLogProb << std::endl;
 	}
 	std::cout << avgValidLogProb << std::endl;
+
+	delete_array(alpha, max_length, N); // allocate enough space for the largest observation sequence
+	delete_array(beta, max_length, N);
+	delete_array(gamma, max_length, N);
+	delete_array3(digamma, max_length, N, N);
+	delete[] coeffs;
 }
 
+void HMM::NFoldTrainingManager::multi_thread_fold(unsigned int nfold, unsigned int _N, unsigned int _M, HMM* _hmm, unsigned int max_sequence_length) {
+	std::vector<unsigned int**> fold_regions;
+	std::vector<unsigned int*> fold_region_lengths;
+	std::vector<unsigned int> fold_region_sizes;
+	N = _N;
+	M = _M;
+	hmm = _hmm;
+	unsigned int fold_size = case_count / nfold;
+	unsigned int** cur_region = data;
+	unsigned int* cur_lengths = lengths;
+
+	fold_regions.push_back(cur_region);
+	fold_region_lengths.push_back(cur_lengths);
+	fold_region_sizes.push_back(fold_size);
+	unsigned int case_accum = fold_size;
+
+	for (unsigned int i = 1; i < nfold-1; i++) {
+		cur_region += fold_size;
+		cur_lengths += fold_size;
+
+		case_accum += fold_size;
+		fold_regions.push_back(cur_region);
+		fold_region_lengths.push_back(cur_lengths);
+		fold_region_sizes.push_back(fold_size);
+	}
+
+	cur_region += fold_size;
+	cur_lengths += fold_size;
+	fold_regions.push_back(cur_region);
+	fold_region_lengths.push_back(cur_lengths);
+	fold_region_sizes.push_back(case_count - case_accum);
+
+	accumulators = new AdjustmentAccumulator[nfold];
+
+	for (unsigned int i = 0; i < fold_regions.size(); i++) {
+		accumulators[i].initialize(N, M);
+		workers.emplace_back(TrainingWorker(
+			fold_regions[i],
+			fold_region_lengths[i],
+			fold_region_sizes[i],
+			max_sequence_length,
+			N,
+			M,
+			hmm,
+			&accumulators[i]
+			));
+	}
+}
+
+HMM::NFoldTrainingManager::~NFoldTrainingManager() {
+	delete[] accumulators;
+}
+
+void HMM::NFoldTrainingManager::train_fold(unsigned int fold_index, AdjustmentAccumulator* master) {
+	std::vector<std::thread> threads;
+	for (unsigned int i = 0; i < workers.size(); i++) {
+		accumulators[i].reset();
+		if (i != fold_index) {
+			threads.emplace_back(std::thread(&(HMM::TrainingWorker::train_work), (HMM::TrainingWorker*)&workers[i]));
+		}
+		else {
+			threads.emplace_back(std::thread(&(HMM::TrainingWorker::valid_work), (HMM::TrainingWorker*)&workers[i]));
+		}
+	}
+
+	for (auto& th : threads) {
+		th.join();
+	}
+
+	// combine all acumulations in the master accumulator
+	master->reset();
+	for (unsigned int i = 0; i < workers.size(); i++) {
+		AdjustmentAccumulator* cur = &accumulators[i];
+		
+		if (i != fold_index) {
+			master->count += cur->count;
+			master->accumLogProb -= cur->accumLogProb;
+			for (unsigned int i = 0; i < N; i++) {
+				master->pi_accum[i] += cur->pi_accum[i];
+				for (unsigned int j = 0; j < N; j++) {
+					master->A_digamma_accum[i][j] += cur->A_digamma_accum[i][j];
+					master->A_gamma_accum[i][j] += cur->A_gamma_accum[i][j];
+				}
+
+				for (unsigned int j = 0; j < M; j++) {
+					master->B_gamma_accum[j][i] += cur->B_gamma_accum[j][i];
+					master->B_obs_accum[j][i] += cur->B_obs_accum[j][i];
+				}
+			}
+		}
+		else {
+			master->accumLogProb_v -= cur->accumLogProb_v;
+			master->accumLogProb_v /= (float)cur->count + 1e-6f;
+		}
+	}
+
+	master->accumLogProb /= (float)master->count + 1e-6f;
+}
+
+HMM::TrainingWorker::TrainingWorker(
+	unsigned int** _case_data,
+	unsigned int* _case_lengths,
+	unsigned int _case_count,
+	unsigned int _sequence_count,
+	unsigned int _N,
+	unsigned int _M,
+	HMM* _hmm,
+	AdjustmentAccumulator* _accumulator
+) {
+	case_data = _case_data;
+	case_lengths = _case_lengths;
+	case_count = case_count;
+	sequence_count = _sequence_count;
+	N = _N;
+	M = _M;
+	hmm = _hmm;
+	accumulator = _accumulator;
+
+	alpha = alloc_mat(sequence_count, N); // allocate enough space for the largest observation sequence
+	beta = alloc_mat(sequence_count, N);
+	gamma = alloc_mat(sequence_count, N);
+	digamma = alloc_mat3(sequence_count, N, N);
+	coeffs = alloc_vec(sequence_count);
+}
+
+HMM::TrainingWorker::~TrainingWorker() {
+	delete_array(alpha, sequence_count, N); // allocate enough space for the largest observation sequence
+	delete_array(beta, sequence_count, N);
+	delete_array(gamma, sequence_count, N);
+	delete_array3(digamma, sequence_count, N, N);
+	delete[] coeffs;
+}
+
+void HMM::TrainingWorker::train_work() {
+	for (unsigned int i = 0; i < case_count; i++) {
+		unsigned int* obs = case_data[i];
+		unsigned int length = case_lengths[i];
+		hmm->alphaPass(obs, length, alpha, coeffs);
+		hmm->betaPass(obs, length, beta, coeffs); // calculate beta
+
+		hmm->calcGamma(obs, length, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
+		hmm->accumAdjust(obs, length, gamma, digamma, *accumulator); // add our adjustments to the accumulator
+
+		for (unsigned int i = 0; i < length; i++)
+			accumulator->accumLogProb -= log(coeffs[i]);
+	}
+}
+
+void HMM::TrainingWorker::valid_work() {
+	for (unsigned int i = 0; i < case_count; i++) {
+		unsigned int* obs = case_data[i];
+		unsigned int length = case_lengths[i];
+		hmm->alphaPass(obs, length, alpha, coeffs);
+
+		for (unsigned int i = 0; i < length; i++)
+			accumulator->accumLogProb_v -= log(coeffs[i]);
+	}
+}

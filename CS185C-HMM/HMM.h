@@ -21,11 +21,55 @@ private:
 		float** B_obs_accum;
 		float* pi_accum;
 		unsigned int N, M, count;
+		float accumLogProb;
+		float accumLogProb_v;
 		void initialize(unsigned int N, unsigned int M);
 		void reset();
 		~AdjustmentAccumulator();
 
 	};
+	struct TrainingWorker {
+		TrainingWorker(
+			unsigned int** _case_data,
+			unsigned int* _case_lengths,
+			unsigned int _case_count,
+			unsigned int _sequence_count,
+			unsigned int _N,
+			unsigned int _M,
+			HMM* _hmm,
+			AdjustmentAccumulator* _accumulator
+			);
+
+		unsigned int** case_data;
+		unsigned int* case_lengths;
+		unsigned int case_count;
+
+		float *coeffs, **alpha, **beta, **gamma, *** digamma;
+		unsigned int sequence_count, N, M;
+
+		HMM* hmm;
+		AdjustmentAccumulator* accumulator;
+		void train_work();
+		void valid_work();
+		~TrainingWorker();
+	};
+
+	struct NFoldTrainingManager {
+		AdjustmentAccumulator* accumulators;
+		unsigned int** data;
+		unsigned int* lengths;
+		unsigned int case_count;
+		unsigned int N;
+		unsigned int M;
+		HMM* hmm;
+		std::vector<TrainingWorker> workers;
+		void multi_thread_fold(unsigned int nfold, unsigned int _N, unsigned int _M, HMM* _hmm, unsigned int max_sequence_length);
+		void train_fold(unsigned int fold_index, AdjustmentAccumulator* master);
+		~NFoldTrainingManager();
+	};
+
+
+
 	int getStateAtT(float** gamma, unsigned int size, unsigned int t);
 	void alphaPass(unsigned int* obs, unsigned int size, float** alpha, float* coeffs);
 	void betaPass(unsigned int* obs, unsigned int size, float** beta, float* coeffs);

@@ -126,7 +126,7 @@ DataMapper generateDataMapFromStats(const std::string& fpath, unsigned int symbo
 	std::string cur;
 	unsigned int i = 0;
 	while (std::getline(file, cur) && i < symbolcount) {
-		std::string opcode = cur.substr(cur.find(','));
+		std::string opcode = cur.substr(0,cur.find(','));
 		mapper[opcode] = i;
 		i++;
 	}

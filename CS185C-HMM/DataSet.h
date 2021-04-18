@@ -10,6 +10,7 @@ public:
 	DataMapper(const std::unordered_map<std::string, unsigned int>& mapper);
 	DataMapper(const DataMapper& o);
 	unsigned int getVal(const std::string& v) const;
+	unsigned int getSymbolCount() const;
 private:
 	std::unordered_map<std::string, unsigned int> raw_mapper; // this should be 1:1 for now
 	unsigned int size;
@@ -46,6 +47,10 @@ public:
 	NFoldIterator getIter(unsigned int nfolds) const;
 	int getSize() const;
 	unsigned int getMaxLength() const;
+	void printExample(unsigned int i) const;
+	unsigned int getSymbolCount() const;
+	unsigned int** getDataPtr() const;
+	unsigned int* getLengthsPtr() const;
 private:
 	void bufferData(DataLoader* loader);
 	DataMapper symbol_map;

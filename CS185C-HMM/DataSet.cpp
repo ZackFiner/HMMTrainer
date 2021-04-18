@@ -1,5 +1,5 @@
 #include "DataSet.h"
-
+#include <iostream>
 
 namespace std_fs = std::filesystem;
 
@@ -17,6 +17,10 @@ DataMapper::DataMapper(const DataMapper& o):
 	raw_mapper(o.raw_mapper),
 	size(o.size)
 {}
+
+unsigned int DataMapper::getSymbolCount() const {
+	return size;
+}
 
 unsigned int DataMapper::getVal(const std::string& v) const
 {
@@ -77,16 +81,24 @@ HMMDataSet::~HMMDataSet() {
 }
 
 void HMMDataSet::bufferData(DataLoader* loader) {
-	std::vector<std::vector<std::string>> cache;
+	std::vector<std::vector<unsigned int>> cache;
 	while (loader->hasNext()) {
-		cache.push_back(loader->nextRecord());
+
+		std::cout << "loading file " << cache.size() << std::endl;
+		std::vector<unsigned int> translated;
+		std::vector<std::string> temp;
+		temp = loader->nextRecord();
+		for (unsigned int i = 0; i < temp.size(); i++)
+			translated.push_back(symbol_map.getVal(temp[i]));
+		
+		cache.push_back(translated);
 	}
 	size = cache.size();
 	data = new unsigned int* [size];
 	lengths = new unsigned int[size];
 	max_length = 0;
 	for (unsigned int i = 0; i < size; i++) {
-		std::vector<std::string>& record = cache[i];
+		std::vector<unsigned int>& record = cache[i];
 		
 		unsigned int record_size = record.size();
 		lengths[i] = record_size;
@@ -95,7 +107,7 @@ void HMMDataSet::bufferData(DataLoader* loader) {
 
 		data[i] = new unsigned int[record_size];
 		for (unsigned int j = 0; j < record_size; j++) {
-			data[i][j] = symbol_map.getVal(record[i]);
+			data[i][j] = record[j];
 		}
 	}
 }
@@ -109,6 +121,28 @@ unsigned int HMMDataSet::getMaxLength() const {
 }
 
 
+void HMMDataSet::printExample(unsigned int i) const {
+	unsigned int* obs = data[i];
+	unsigned int length = lengths[i];
+	std::cout << "obs: [ ";
+	for (unsigned int i = 0; i < length; i++) {
+		std::cout << obs[i] << " ";
+	}
+	std::cout << "]" << std::endl;
+}
+
+unsigned int HMMDataSet::getSymbolCount() const {
+	return symbol_map.getSymbolCount();
+}
+
+unsigned int** HMMDataSet::getDataPtr() const {
+	return data;
+}
+
+unsigned int* HMMDataSet::getLengthsPtr() const {
+	return lengths;
+}
+
 NFoldIterator HMMDataSet::getIter(unsigned int nfolds) const {
 	return NFoldIterator(*this, nfolds);
 }
@@ -119,17 +153,19 @@ NFoldIterator::NFoldIterator(const HMMDataSet& _loader, unsigned int _nfolds): l
 	int l_size = loader.getSize();
 
 	fold_size = l_size / nfolds;
+	std::cout << fold_size << std::endl;
 	fold_index = 0;
+	end = loader.data + l_size;
 
-	fold_start = loader.data;
-	fold_end = std::min(loader.data + fold_size, end);
+	fold_start = loader.data; 
+	unsigned int** new_fold_end = fold_start + fold_size;
+	fold_end = new_fold_end > end ? end : new_fold_end;
+
 	cur_validate_ptr = loader.data;
 	cur_validate_length_ptr = loader.lengths;
 
-	
 	cur_train_ptr = loader.data + fold_size;
 	cur_train_length_ptr = loader.lengths + fold_size;
-	end = loader.data + l_size;
 
 }
 
@@ -183,8 +219,8 @@ bool NFoldIterator::nextFold() {
 	}
 	else {
 		fold_start += fold_size;
-		fold_end = std::min(fold_end + fold_size, end);
-
+		unsigned int** new_fold_end = fold_end + fold_size;
+		fold_end = new_fold_end > end ? end : new_fold_end;
 		cur_validate_ptr += fold_size;
 		cur_validate_length_ptr += fold_size;
 
