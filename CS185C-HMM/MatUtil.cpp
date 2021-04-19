@@ -72,6 +72,15 @@ float get_max_abs(float** mat, unsigned int N, unsigned int M) {
 	return abs_max;
 }
 
+float get_max_abs(float* vec, unsigned int N) {
+	float abs_max = 0.0f;
+	for (unsigned int i = 0; i < N; i++) {
+		float v = vec[i];
+		if (abs(v) > abs(abs_max))
+			abs_max = v;
+	}
+	return abs_max;
+}
 
 float** alloc_mat(float** init, unsigned int N, unsigned int M) {
 	float** r_val = new float* [N];
@@ -122,6 +131,31 @@ void print_matrix(float** mat, unsigned int N, unsigned int M, bool transpose) {
 		}
 		std::cout << "|";
 	}
+	std::cout << std::endl;
+
+}
+
+void print_vector(float* vec, unsigned int N) {
+
+	float abs_max = get_max_abs(vec, N);
+	int max_padding = std::to_string(abs_max).length() + 5;
+
+	std::cout << "\n|";
+	for (unsigned int i = 0; i < N; i++) {
+
+		float v = vec[i];
+		auto num = std::to_string(v);
+		int l = num.length();
+		int padding = max_padding - l;
+		int pre_padding = padding >> 1; // padding /2
+		int post_padding = (padding >> 1) + (1 & padding);// padding /2 + 1 if padding is odd
+
+		pre_padding = v >= 0.0 ? pre_padding : pre_padding - 1;
+		post_padding = v >= 0.0 ? post_padding : post_padding + 1;
+		std::cout << std::string(pre_padding, ' ') << num << std::string(post_padding, ' ');
+		
+	}
+	std::cout << "|";
 	std::cout << std::endl;
 
 }

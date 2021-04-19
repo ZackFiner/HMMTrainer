@@ -25,7 +25,7 @@ unsigned int DataMapper::getSymbolCount() const {
 unsigned int DataMapper::getVal(const std::string& v) const
 {
 	auto loc = this->raw_mapper.find(v);
-	return loc != raw_mapper.end() ? loc->second : size;
+	return loc != raw_mapper.end() ? loc->second : size-1;
 }
 
 NewLineSeperatedLoader::NewLineSeperatedLoader(std::string _fpath):

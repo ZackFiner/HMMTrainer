@@ -205,7 +205,7 @@ void HMM::applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 			for (unsigned int t = 0; t < size; t++) {
 				float cur_gamma = gamma[t][i];
 				gamma_total_sum += cur_gamma;
-				if (obs[t] == i)
+				if (obs[t] == k)
 					gamma_obs_sum += cur_gamma;
 			}
 
@@ -299,10 +299,10 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 		for (unsigned int k = 0; k < M; k++) {
 			float gamma_obs_sum = 0.0f;
 			float gamma_total_sum = 0.0f;
-			for (unsigned int t = 0; t < size; t++) {
+			for (unsigned int t = 0; t < size - 1; t++) {
 				float cur_gamma = gamma[t][i];
 				gamma_total_sum += cur_gamma;
-				if (obs[t] == i)
+				if (obs[t] == k)
 					gamma_obs_sum += cur_gamma;
 			}
 
@@ -335,6 +335,9 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 
 			std::cout << accum.accumLogProb << std::endl;
 			std::cout << accum.accumLogProb_v << std::endl;
+			print_vector(Pi, N);
+			print_matrix(A, N, N);
+			print_matrix(B, M, N);
 			applyAdjust(accum);
 		}
 
@@ -421,7 +424,7 @@ void HMM::NFoldTrainingManager::train_fold(unsigned int fold_index, AdjustmentAc
 		
 		if (i != fold_index) {
 			master->count += cur->count;
-			master->accumLogProb -= cur->accumLogProb*div;
+			master->accumLogProb += cur->accumLogProb*div;
 			for (unsigned int i = 0; i < N; i++) {
 				master->pi_accum[i] += cur->pi_accum[i]*div;
 				for (unsigned int j = 0; j < N; j++) {
@@ -460,6 +463,9 @@ void HMM::TrainingWorker::initialize(
 	hmm = _hmm;
 	accumulator = _accumulator;
 
+
+	// note: These are too big, the sequence count can be > 20,000 in some cases: you need to find a way to use less memory
+	// Solution: don't pre-compute digamma and gamma along t, just compute it for one t at a time, store it, and then accumulate each computation
 	alpha = alloc_mat(sequence_count, N); // allocate enough space for the largest observation sequence
 	beta = alloc_mat(sequence_count, N);
 	gamma = alloc_mat(sequence_count, N);
@@ -485,9 +491,11 @@ void HMM::TrainingWorker::train_work() {
 
 		hmm->calcGamma(obs, length, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
 		hmm->accumAdjust(obs, length, gamma, digamma, *accumulator); // add our adjustments to the accumulator
-
+		float logProb = 0.0f;
 		for (unsigned int i = 0; i < length; i++)
-			accumulator->accumLogProb -= log(coeffs[i]);
+			logProb += log(coeffs[i]);
+
+		accumulator->accumLogProb += -logProb;
 	}
 }
 
@@ -496,10 +504,11 @@ void HMM::TrainingWorker::valid_work() {
 		unsigned int* obs = case_data[i];
 		unsigned int length = case_lengths[i];
 		hmm->alphaPass(obs, length, alpha, coeffs);
-		
+		float logProb = 0.0f;
 		for (unsigned int i = 0; i < length; i++)
-			accumulator->accumLogProb_v -= log(coeffs[i]);
+			logProb += log(coeffs[i]);
 
+		accumulator->accumLogProb_v += -logProb;
 		accumulator->count++;
 	}
 }
