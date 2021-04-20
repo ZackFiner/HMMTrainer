@@ -2,6 +2,7 @@
 #include "DataSet.h"
 #include <fstream>
 #include <unordered_map>
+#include <sstream>
 
 float** transpose(float** mat, unsigned int N, unsigned int M) {
 	// NxM -> MxN
@@ -106,10 +107,13 @@ float* alloc_vec(float* init, unsigned int N) {
 	return r_val;
 }
 
-void print_matrix(float** mat, unsigned int N, unsigned int M, bool transpose) {
+void print_matrix(float** mat, unsigned int N, unsigned int M, bool transpose, unsigned int prec) {
 
 	float abs_max = get_max_abs(mat, N, M);
-	int max_padding = std::to_string(abs_max).length() + 5;
+	std::ostringstream converter;
+	converter.precision(prec);
+	converter << std::fixed << abs_max;
+	int max_padding = converter.str().length() + 3;
 
 	unsigned int width = transpose ? M : N;
 	unsigned int height = transpose ? N : M;
@@ -119,7 +123,10 @@ void print_matrix(float** mat, unsigned int N, unsigned int M, bool transpose) {
 		std::cout << "\n|";
 		for (unsigned int j = 0; j < height; j++) {
 			float v = transpose ? mat[j][i] : mat[i][j];
-			auto num = std::to_string(v);
+			converter.str("");
+			converter.clear();
+			converter << std::fixed << v;
+			auto num = converter.str();
 			int l = num.length();
 			int padding = max_padding - l;
 			int pre_padding = padding >> 1; // padding /2
@@ -135,16 +142,22 @@ void print_matrix(float** mat, unsigned int N, unsigned int M, bool transpose) {
 
 }
 
-void print_vector(float* vec, unsigned int N) {
+void print_vector(float* vec, unsigned int N, unsigned int prec) {
 
 	float abs_max = get_max_abs(vec, N);
-	int max_padding = std::to_string(abs_max).length() + 5;
+	std::ostringstream converter;
+	converter.precision(prec);
+	converter << std::fixed << abs_max;
+	int max_padding = converter.str().length() + 3;
 
 	std::cout << "\n|";
 	for (unsigned int i = 0; i < N; i++) {
 
-		float v = vec[i];
-		auto num = std::to_string(v);
+		float v = vec[i];			
+		converter.str("");
+		converter.clear();
+		converter << std::fixed << v;
+		auto num = converter.str();
 		int l = num.length();
 		int padding = max_padding - l;
 		int pre_padding = padding >> 1; // padding /2

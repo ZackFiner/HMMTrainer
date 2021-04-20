@@ -45,7 +45,7 @@ private:
 		unsigned int* case_lengths;
 		unsigned int case_count;
 
-		float *coeffs=nullptr, **alpha=nullptr, **beta=nullptr, **gamma=nullptr, *** digamma=nullptr;
+		float *coeffs=nullptr, **alpha=nullptr, **beta=nullptr, *gamma=nullptr, ** digamma=nullptr;
 		unsigned int sequence_count, N, M;
 
 		HMM* hmm;
@@ -76,10 +76,12 @@ private:
 	void alphaPass(unsigned int* obs, unsigned int size, float** alpha, float* coeffs);
 	void betaPass(unsigned int* obs, unsigned int size, float** beta, float* coeffs);
 	void calcGamma(unsigned int* obs, unsigned int size, float** alpha, float **beta, float** gamma, float*** digamma);
+	void calcGamma(unsigned int* obs, unsigned int size, unsigned int t, float** alpha, float** beta, float* gamma, float** digamma);
 
 	void applyAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma);
 	void applyAdjust(const AdjustmentAccumulator& accum);
 	void accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float*** digamma, AdjustmentAccumulator& accum);
+	void accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, float* gamma, float** digamma, AdjustmentAccumulator& accum);
 	float calcSeqProb(float** alpha, unsigned int size);
 
 

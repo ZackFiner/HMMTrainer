@@ -4,6 +4,7 @@
 #include "DataSet.h"
 #include <math.h>
 #include <thread>
+#include <xmmintrin.h>
 
 HMM::HMM() {
 
@@ -175,9 +176,35 @@ void HMM::calcGamma(unsigned int* obs, unsigned int size, float** alpha, float**
 
 	for (unsigned int i = 0; i < N; i++)
 		gamma[size - 1][i] = alpha[size - 1][i] * div;
+}
 
+void HMM::calcGamma(unsigned int* obs, unsigned int size, unsigned int t, float** alpha, float** beta, float* gamma, float** digamma) {
+	float div = 1e-10f;
+	float val;
+	if (t < size-1) {
+		for (unsigned int i = 0; i < N; i++) {
+			for (unsigned int j = 0; j < N; j++) {
+				div += alpha[t][i] * A[i][j] * B[obs[t + 1]][j] * beta[t + 1][j];
+			}
+		}
+		div = 1.0f / div;
+		for (unsigned int i = 0; i < N; i++) {
+			gamma[i] = 0.0f;
+			for (unsigned int j = 0; j < N; j++) {
+				val = alpha[t][i] * A[i][j] * B[obs[t + 1]][j] * beta[t + 1][j] * div;
+				digamma[i][j] = val;
+				gamma[i] += val;
+			}
+		}
+	}
+	else if (t == size - 1) {
+		for (unsigned int i = 0; i < N; i++)
+			div += alpha[size - 1][i];
+		div = 1.0f / div;
 
-
+		for (unsigned int i = 0; i < N; i++)
+			gamma[i] = alpha[size - 1][i] * div;
+	}
 }
 
 // THIS ONLY WORKS FOR 1 SEQUENCE
@@ -314,6 +341,34 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 	accum.count += 1;
 }
 
+void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, float* gamma, float** digamma, AdjustmentAccumulator& accum) {
+	if (t == 0) {
+		for (unsigned int i = 0; i < N; i++) {
+			accum.pi_accum[i] += gamma[i]; // use our calculated initial probability from gamma
+		}
+	}
+	if (t < size - 1) {
+		for (unsigned int i = 0; i < N; i++) {
+			for (unsigned int j = 0; j < N; j++) {
+
+				accum.A_digamma_accum[i][j] += digamma[i][j];
+				accum.A_gamma_accum[i][j] += gamma[i];
+
+			}
+		}
+
+		for (unsigned int i = 0; i < N; i++) {
+			for (unsigned int k = 0; k < M; k++) {
+				float cur_gamma = gamma[i];
+				accum.B_gamma_accum[k][i] += cur_gamma;
+				accum.B_obs_accum[k][i] += obs[t] == k ? cur_gamma : 0.0f;
+
+			}
+		}
+	}
+}
+
+
 void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigned int n_folds) {
 
 	NFoldIterator iter = dataset.getIter(n_folds);
@@ -336,8 +391,8 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 			std::cout << accum.accumLogProb << std::endl;
 			std::cout << accum.accumLogProb_v << std::endl;
 			print_vector(Pi, N);
-			print_matrix(A, N, N);
-			print_matrix(B, M, N);
+			print_matrix(A, N, N, false);
+			//print_matrix(B, M, N, false);
 			applyAdjust(accum);
 		}
 
@@ -468,18 +523,20 @@ void HMM::TrainingWorker::initialize(
 	// Solution: don't pre-compute digamma and gamma along t, just compute it for one t at a time, store it, and then accumulate each computation
 	alpha = alloc_mat(sequence_count, N); // allocate enough space for the largest observation sequence
 	beta = alloc_mat(sequence_count, N);
-	gamma = alloc_mat(sequence_count, N);
-	digamma = alloc_mat3(sequence_count, N, N);
+	gamma = alloc_vec(N);
+	digamma = alloc_mat(N, N);
 	coeffs = alloc_vec(sequence_count);
 }
 
 HMM::TrainingWorker::~TrainingWorker() {
 	delete_array(alpha, sequence_count, N); // allocate enough space for the largest observation sequence
 	delete_array(beta, sequence_count, N);
-	delete_array(gamma, sequence_count, N);
-	delete_array3(digamma, sequence_count, N, N);
+	delete_array(digamma, N, N);
 	if (coeffs)
 		delete[] coeffs;
+
+	if (gamma)
+		delete[] gamma;
 }
 
 void HMM::TrainingWorker::train_work() {
@@ -488,9 +545,10 @@ void HMM::TrainingWorker::train_work() {
 		unsigned int length = case_lengths[i];
 		hmm->alphaPass(obs, length, alpha, coeffs);
 		hmm->betaPass(obs, length, beta, coeffs); // calculate beta
-
-		hmm->calcGamma(obs, length, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
-		hmm->accumAdjust(obs, length, gamma, digamma, *accumulator); // add our adjustments to the accumulator
+		for (unsigned int i = 0; i < length; i++) {
+			hmm->calcGamma(obs, length, i, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
+			hmm->accumAdjust(obs, length, i, gamma, digamma, *accumulator); // add our adjustments to the accumulator
+		}
 		float logProb = 0.0f;
 		for (unsigned int i = 0; i < length; i++)
 			logProb += log(coeffs[i]);
