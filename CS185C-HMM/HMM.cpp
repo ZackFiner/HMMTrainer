@@ -4,7 +4,7 @@
 #include "DataSet.h"
 #include <math.h>
 #include <thread>
-#include <xmmintrin.h>
+//#include <xmmintrin.h>
 
 HMM::HMM() {
 
