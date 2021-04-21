@@ -7,8 +7,8 @@
 #include "ProbInit.h"
 
 int main() {
-	NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot");
-	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot_stats.csv", 50);
+	NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess");
+	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess_stats.csv", 50);
 	HMMDataSet winwebsec_dataset = HMMDataSet(&loader, winwebsec_mapper);
 	winwebsec_dataset.printExample(0);
 	HMM hmm = HMM(7, winwebsec_dataset.getSymbolCount());

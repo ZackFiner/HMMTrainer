@@ -4,6 +4,7 @@
 class HMMDataSet;
 class ProbInit;
 
+
 class HMM
 {
 public:
@@ -13,6 +14,7 @@ public:
 	~HMM();
 	int* getIdealStateSequence(unsigned int* obs, unsigned int size);
 	void trainModel(const HMMDataSet& dataset, unsigned int iterations = 10, unsigned int n_folds = 10);
+	friend void pickle_hmm(HMM* hmm, std::string fpath);
 private:
 	struct AdjustmentAccumulator {
 		float** A_gamma_accum;
