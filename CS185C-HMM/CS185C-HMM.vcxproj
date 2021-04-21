@@ -143,12 +143,14 @@
   <ItemGroup>
     <ClCompile Include="DataSet.cpp" />
     <ClCompile Include="HMM.cpp" />
+    <ClCompile Include="HmmUtil.cpp" />
     <ClCompile Include="Main.cpp" />
     <ClCompile Include="MatUtil.cpp" />
     <ClCompile Include="ProbInit.cpp" />
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="DataSet.h" />
+    <ClInclude Include="HmmUtil.h" />
     <ClInclude Include="HMM.h" />
     <ClInclude Include="MatUtil.h" />
     <ClInclude Include="ProbInit.h" />
