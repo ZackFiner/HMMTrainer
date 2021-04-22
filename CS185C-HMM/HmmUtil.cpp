@@ -24,10 +24,10 @@ void pickle_hmm(HMM* hmm, std::string fpath) {
 		dataregion[index++] = hmm->Pi[i];
 	for (unsigned int i = 0; i < N; i++)
 		for (unsigned int j = 0; j < N; j++)
-			dataregion[index++] = hmm->A[i][j];
+			dataregion[index++] = hmm->A[i*N + j];
 	for (unsigned int i = 0; i < M; i++)
 		for (unsigned int j = 0; j < N; j++)
-			dataregion[index++] = hmm->B[i][j];
+			dataregion[index++] = hmm->B[i*N + j];
 	try {
 		std::fstream file = std::fstream(fpath, std::ios::out | std::ios::binary);
 		file.write((char*)&buffer[0], words << 2);
@@ -58,14 +58,14 @@ void initialize_hmm(HMM* hmm, std::string fpath) {
 	for (unsigned int i = 0; i < N; i++) {
 		for (unsigned int j = 0; j < N; j++) {
 			file.read((char*)&f_buff, sizeof(float));
-			hmm->A[i][j] = f_buff;
+			hmm->A[i*N + j] = f_buff;
 		}
 	}
 
 	for (unsigned int i = 0; i < M; i++) {
 		for (unsigned int j = 0; j < N; j++) {
 			file.read((char*)&f_buff, sizeof(float));
-			hmm->B[i][j] = f_buff;
+			hmm->B[i*N + j] = f_buff;
 		}
 	}
 	file.close();
