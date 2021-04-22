@@ -108,7 +108,7 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 		for (unsigned int i = 0; i < N; i++) {
 			float sum = 0;
 			for (unsigned int j = 0; j < N; j++) {
-				sum += alpha[(t - 1)*N + j] * A[j*N + i]; // probability that we'd see the previous hidden state * the probability we'd transition to this new hidden state
+				sum += alpha[last_alpha_idx + j] * A[j*N + i]; // probability that we'd see the previous hidden state * the probability we'd transition to this new hidden state
 			}
 			val = sum * B[obs_idx + i];
 			alpha[cur_alpha_idx + i] = val;
