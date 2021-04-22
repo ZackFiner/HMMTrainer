@@ -88,8 +88,9 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 
 	float val;
 	coeffs[0] = 0.0f;
+	unsigned int obs_idx = obs[0] * N;
 	for (unsigned int i = 0; i < N; i++) {
-		val = Pi[i] * B[obs[0]*N + i];
+		val = Pi[i] * B[obs_idx + i];
 		alpha[/* 0*N+ */i] = val; // B has been transposed to improve spatial locality
 		coeffs[0] += val;
 	}
@@ -101,13 +102,16 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 
 	for (unsigned int t = 1; t < size; t++) {
 		coeffs[t] = 0.0f;
+		unsigned int last_alpha_idx = (t - 1) * N;
+		unsigned int cur_alpha_idx = t * N;
+		obs_idx = obs[t] * N;
 		for (unsigned int i = 0; i < N; i++) {
 			float sum = 0;
 			for (unsigned int j = 0; j < N; j++) {
 				sum += alpha[(t - 1)*N + j] * A[j*N + i]; // probability that we'd see the previous hidden state * the probability we'd transition to this new hidden state
 			}
-			val = sum * B[obs[t]*N + i];
-			alpha[t*N + i] = val;
+			val = sum * B[obs_idx + i];
+			alpha[cur_alpha_idx + i] = val;
 			coeffs[t] += val;
 			 
 		}
@@ -115,7 +119,7 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 		div = 1.0f / coeffs[t];
 		coeffs[t] = div;
 		for (unsigned int i = 0; i < N; i++)  // scale the values s.t. alpha[t][0] + alpha[t][1] + ... = 1
-			alpha[t*N + i] *= div;
+			alpha[cur_alpha_idx + i] *= div;
 
 	}
 	
@@ -133,17 +137,22 @@ float HMM::calcSeqProb(float* alpha, unsigned int size) {
 }
 
 void HMM::betaPass(unsigned int* obs, unsigned int size, float* beta, float* coeffs) {
+	unsigned int beta_end = (size - 1) * N;
 	for (unsigned int i = 0; i < N; i++)
-		beta[(size - 1)*N + i] = coeffs[size-1];
+		beta[beta_end + i] = coeffs[size-1];
 
 	for (int t = size-2; t >= 0; t--) {
+		unsigned int obs_idx = obs[t + 1] * N;
+		unsigned int cur_beta_idx = t * N;
+		unsigned int beta_idx = (t + 1) * N;
 		float ct = coeffs[t];
 		for (unsigned int i = 0; i < N; i++) {
 			float sum = 0;
+			unsigned int row_idx = i * N;
 			for (unsigned int j = 0; j < N; j++)
-				sum += A[i*N + j] * B[obs[t + 1]*N + j] * beta[(t + 1)*N + j];
+				sum += A[row_idx + j] * B[obs_idx + j] * beta[beta_idx + j];
 
-			beta[t*N + i] = sum*ct;
+			beta[cur_beta_idx + i] = sum*ct;
 		}
 	}
 
@@ -248,14 +257,18 @@ void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
 	}
 
 	for (unsigned int i = 0; i < N; i++) {
+		unsigned int row_ind = i * N;
 		for (unsigned int j = 0; j < N; j++) {
-			this->A[i*N + j] = accum.A_digamma_accum[i*N + j] / accum.A_gamma_accum[i*N + j];// assign our new transition probability for Aij
+			unsigned int col_ind = row_ind + j;
+			this->A[col_ind] = accum.A_digamma_accum[col_ind] / accum.A_gamma_accum[col_ind];// assign our new transition probability for Aij
 		}
 	}
 
 	for (unsigned int i = 0; i < N; i++) {
+		unsigned int row_ind = i * M;
 		for (unsigned int k = 0; k < M; k++) {
-			this->B[k*N + i] = accum.B_obs_accum[k*N + i] / accum.B_gamma_accum[k*N + i]; //re-estimate our Bik
+			unsigned int col_ind = row_ind + k;
+			this->B[col_ind] = accum.B_obs_accum[col_ind] / accum.B_gamma_accum[col_ind]; //re-estimate our Bik
 		}
 	}
 }
@@ -355,19 +368,21 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, floa
 	}
 	if (t < size - 1) {
 		for (unsigned int i = 0; i < N; i++) {
+			unsigned int row_ind = i * N;
 			for (unsigned int j = 0; j < N; j++) {
-
-				accum.A_digamma_accum[i*N + j] += digamma[i*N + j];
-				accum.A_gamma_accum[i*N + j] += gamma[i];
+				unsigned int col_ind = row_ind + j;
+				accum.A_digamma_accum[col_ind] += digamma[col_ind];
+				accum.A_gamma_accum[col_ind] += gamma[i];
 
 			}
 		}
-
-		for (unsigned int i = 0; i < N; i++) {
-			for (unsigned int k = 0; k < M; k++) {
+		for (unsigned int k = 0; k < M; k++) {
+			unsigned int row_ind = k * N;
+			for (unsigned int i = 0; i < N; i++) {
+				unsigned int col_ind = row_ind + i;
 				float cur_gamma = gamma[i];
-				accum.B_gamma_accum[k*N + i] += cur_gamma;
-				accum.B_obs_accum[k*N + i] += obs[t] == k ? cur_gamma : 0.0f;
+				accum.B_gamma_accum[col_ind] += cur_gamma;
+				accum.B_obs_accum[col_ind] += obs[t] == k ? cur_gamma : 0.0f;
 
 			}
 		}
@@ -398,7 +413,7 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 			std::cout << accum.accumLogProb_v << std::endl;
 			print_vector(Pi, N);
 			print_matrix(A, N, N, false);
-			//print_matrix(B, M, N, false);
+			print_matrix(B, M, N, false);
 			applyAdjust(accum);
 		}
 
@@ -488,14 +503,17 @@ void HMM::NFoldTrainingManager::train_fold(unsigned int fold_index, AdjustmentAc
 			master->accumLogProb += cur->accumLogProb*div;
 			for (unsigned int i = 0; i < N; i++) {
 				master->pi_accum[i] += cur->pi_accum[i]*div;
+				unsigned int row_index = i * N;
 				for (unsigned int j = 0; j < N; j++) {
-					master->A_digamma_accum[i*N + j] += cur->A_digamma_accum[i*N + j]*div;
-					master->A_gamma_accum[i*N + j] += cur->A_gamma_accum[i*N + j]*div;
+					unsigned int location = row_index + j;
+					master->A_digamma_accum[location] += cur->A_digamma_accum[location]*div;
+					master->A_gamma_accum[location] += cur->A_gamma_accum[location]*div;
 				}
 
 				for (unsigned int j = 0; j < M; j++) {
-					master->B_gamma_accum[j*N + i] += cur->B_gamma_accum[j*N + i]*div;
-					master->B_obs_accum[j*N + i] += cur->B_obs_accum[j*N + i]*div;
+					unsigned int location = j * N + i;
+					master->B_gamma_accum[location] += cur->B_gamma_accum[location]*div;
+					master->B_obs_accum[location] += cur->B_obs_accum[location]*div;
 				}
 			}
 		}
