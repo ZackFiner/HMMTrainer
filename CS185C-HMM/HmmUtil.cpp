@@ -6,7 +6,7 @@
 void pickle_hmm(HMM* hmm, std::string fpath) {
 	unsigned int N, M, index;
 	N = hmm->N;
-	M = hmm->N;
+	M = hmm->M;
 	unsigned long words = 2 + N + N * N + N * M;
 	float* buffer = new float[words];
 	// simple pickle format:
@@ -37,4 +37,37 @@ void pickle_hmm(HMM* hmm, std::string fpath) {
 		std::cerr << "Error: could not pickle hmm " << hmm << " to file " << fpath << std::endl;
 	}
 	delete[] buffer;
+}
+
+void initialize_hmm(HMM* hmm, std::string fpath) {
+	unsigned int M, N;
+
+	std::ifstream file(fpath, std::ios::binary);
+	file.read((char*)&M, sizeof(unsigned int));
+	file.read((char*)&N, sizeof(unsigned int));
+
+	if (hmm->M != M || hmm->N != N) {
+		file.close();
+		return;
+	}
+	float f_buff;
+	for (unsigned int i = 0; i < N; i++) {
+		file.read((char*)&f_buff, sizeof(float));
+		hmm->Pi[i] = f_buff;
+	}
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int j = 0; j < N; j++) {
+			file.read((char*)&f_buff, sizeof(float));
+			hmm->A[i][j] = f_buff;
+		}
+	}
+
+	for (unsigned int i = 0; i < M; i++) {
+		for (unsigned int j = 0; j < N; j++) {
+			file.read((char*)&f_buff, sizeof(float));
+			hmm->B[i][j] = f_buff;
+		}
+	}
+	file.close();
+
 }

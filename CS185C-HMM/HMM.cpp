@@ -341,6 +341,12 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, float** gamma, float
 	accum.count += 1;
 }
 
+void HMM::print_mats() const {
+	print_vector(Pi, N, 5U);
+	print_matrix(A, N, N, false, 5U);
+	print_matrix(B, M, N, false, 5U);
+}
+
 void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, float* gamma, float** digamma, AdjustmentAccumulator& accum) {
 	if (t == 0) {
 		for (unsigned int i = 0; i < N; i++) {
