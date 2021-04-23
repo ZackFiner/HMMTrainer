@@ -55,6 +55,10 @@ int HMM::getStateAtT(float* gamma, unsigned int size, unsigned int t) {
 	return max_idx;
 }
 
+void HMM::setDataMapper(const DataMapper& o) {
+	native_symbolmap = o;
+}
+
 int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
 	float* alpha = alloc_mat(size, N);
 	float* beta = alloc_mat(size, N);
@@ -84,7 +88,7 @@ int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
 	return r_array;
 }
 
-void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* coeffs) {
+void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* coeffs) const {
 
 	float val;
 	coeffs[0] = 0.0f;
@@ -136,7 +140,7 @@ float HMM::calcSeqProb(float* alpha, unsigned int size) {
 	return seqProb;
 }
 
-void HMM::betaPass(unsigned int* obs, unsigned int size, float* beta, float* coeffs) {
+void HMM::betaPass(unsigned int* obs, unsigned int size, float* beta, float* coeffs) const {
 	unsigned int beta_end = (size - 1) * N;
 	for (unsigned int i = 0; i < N; i++)
 		beta[beta_end + i] = coeffs[size-1];
@@ -405,16 +409,31 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 
 	trainer.multi_thread_fold(n_folds, N, M, this, max_length);
 
+	float last_training_score, last_validation_score;
+	trainer.score_fold(0, &accum);
+	last_training_score = accum.accumLogProb;
+	last_validation_score = accum.accumLogProb_v;
+
 	for (unsigned int epoch = 0; epoch < iterations; epoch++) {
 		for (unsigned int i = 0; i < n_folds; i++) {
 			trainer.train_fold(i, &accum);
 
-			std::cout << accum.accumLogProb << std::endl;
-			std::cout << accum.accumLogProb_v << std::endl;
+
+			applyAdjust(accum);
+
+			// calculate the score improvement
+			trainer.score_fold(i, &accum);
+			float training_score_gain = accum.accumLogProb - last_training_score;
+			float validation_score_gain = accum.accumLogProb_v - last_validation_score;
+
+			last_validation_score = accum.accumLogProb_v;
+			last_training_score = accum.accumLogProb;
 			print_vector(Pi, N);
 			print_matrix(A, N, N, false);
-			print_matrix(B, M, N, false);
-			applyAdjust(accum);
+			//print_matrix(B, M, N, false);
+			std::cout << "Training Score: " << accum.accumLogProb << std::endl;
+			std::cout << "Validation Score: " << accum.accumLogProb_v << std::endl;
+
 		}
 
 	}
@@ -474,6 +493,33 @@ void HMM::NFoldTrainingManager::multi_thread_fold(unsigned int nfold, unsigned i
 HMM::NFoldTrainingManager::~NFoldTrainingManager() {
 	delete[] accumulators;
 	delete[] workers;
+}
+
+void HMM::NFoldTrainingManager::score_fold(unsigned int fold_index, AdjustmentAccumulator* master) {
+	std::vector<std::thread> threads;
+	for (unsigned int i = 0; i < fold_count; i++) {
+		accumulators[i].reset();
+		threads.emplace_back(std::thread(&(HMM::TrainingWorker::valid_work), (HMM::TrainingWorker*)&workers[i]));
+	}
+
+	for (auto& th : threads) {
+		th.join();
+	}
+
+	float div = 1.0f / (float)(case_count - accumulators[fold_index].count);
+	// combine all acumulations in the master accumulator
+	master->reset();
+	for (unsigned int i = 0; i < fold_count; i++) {
+		AdjustmentAccumulator* cur = &accumulators[i];
+
+		if (i != fold_index) {
+			master->count += cur->count;
+			master->accumLogProb += cur->accumLogProb_v * div;
+		}
+		else {
+			master->accumLogProb_v = cur->accumLogProb_v / ((float)cur->count + 1e-6f);
+		}
+	}
 }
 
 void HMM::NFoldTrainingManager::train_fold(unsigned int fold_index, AdjustmentAccumulator* master) {
@@ -593,4 +639,50 @@ void HMM::TrainingWorker::valid_work() {
 		accumulator->accumLogProb_v += -logProb;
 		accumulator->count++;
 	}
+}
+
+
+void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const {
+	HMMDataSet remapped_pos = positives.getRemapped(native_symbolmap);
+	unsigned int** pos_data = remapped_pos.getDataPtr();
+	unsigned int* pos_l = remapped_pos.getLengthsPtr();
+	HMMDataSet remapped_neg = negatives.getRemapped(native_symbolmap);
+	unsigned int** neg_data = remapped_neg.getDataPtr();
+	unsigned int* neg_l = remapped_neg.getLengthsPtr();
+	unsigned int  tp=0, tn=0, fp=0, fn=0;
+
+	unsigned int pos_size = remapped_pos.getSize();
+	unsigned int neg_size = remapped_neg.getSize();
+	
+	unsigned int max_t_size = std::max(remapped_pos.getMaxLength(), remapped_neg.getMaxLength());
+	float* alpha = alloc_mat(max_t_size, N);
+	float* coeffs = alloc_vec(max_t_size);
+	
+	
+	for (unsigned int i = 0; i < pos_size; i++) {
+		unsigned int length = pos_l[i];
+		alphaPass(pos_data[i], length, alpha, coeffs);
+
+		float rating = 0.0f;
+		for (unsigned int j = 0; j < length; j++)
+			rating += log(coeffs[j]);
+
+		tp += rating >= thresh;
+		fn += rating < thresh;
+	}
+
+	for (unsigned int i = 0; i < neg_size; i++) {
+		unsigned int length = neg_l[i];
+		alphaPass(neg_data[i], length, alpha, coeffs);
+
+		float rating = 0.0f;
+		for (unsigned int j = 0; j < length; j++)
+			rating += log(coeffs[j]);
+
+		tn += rating < thresh;
+		fp += rating >= thresh;
+	}
+
+	delete_array(alpha, max_t_size, N);
+	delete[] coeffs;
 }

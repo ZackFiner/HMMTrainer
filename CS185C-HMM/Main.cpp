@@ -13,7 +13,9 @@ int main() {
 	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess_stats.csv", 50);
 	HMMDataSet winwebsec_dataset = HMMDataSet(&loader, winwebsec_mapper);
 	winwebsec_dataset.printExample(0);
-	HMM hmm = HMM(7, winwebsec_dataset.getSymbolCount());
+
+	DefaultProbInit initializer(0.8f);
+	HMM hmm = HMM(7, winwebsec_dataset.getSymbolCount(), &initializer);
 	hmm.trainModel(winwebsec_dataset, 100, 10);
 	
 	/*

@@ -1,7 +1,8 @@
 #pragma once
 #include <vector>
 #include <string>
-class HMMDataSet;
+#include "DataSet.h"
+
 class ProbInit;
 
 
@@ -17,6 +18,7 @@ public:
 	void print_mats() const;
 	friend void pickle_hmm(HMM* hmm, std::string fpath);
 	friend void initialize_hmm(HMM* hmm, std::string fpath);
+	void setDataMapper(const DataMapper& o);
 
 private:
 	struct AdjustmentAccumulator {
@@ -72,14 +74,15 @@ private:
 		TrainingWorker* workers;
 		void multi_thread_fold(unsigned int nfold, unsigned int _N, unsigned int _M, HMM* _hmm, unsigned int max_sequence_length);
 		void train_fold(unsigned int fold_index, AdjustmentAccumulator* master);
+		void score_fold(unsigned int fold_index, AdjustmentAccumulator* master);
 		~NFoldTrainingManager();
 	};
 
 
 
 	int getStateAtT(float* gamma, unsigned int size, unsigned int t);
-	void alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* coeffs);
-	void betaPass(unsigned int* obs, unsigned int size, float* beta, float* coeffs);
+	void alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* coeffs) const;
+	void betaPass(unsigned int* obs, unsigned int size, float* beta, float* coeffs) const;
 	void calcGamma(unsigned int* obs, unsigned int size, float* alpha, float *beta, float* gamma, float* digamma);
 	void calcGamma(unsigned int* obs, unsigned int size, unsigned int t, float* alpha, float* beta, float* gamma, float* digamma);
 
@@ -88,8 +91,9 @@ private:
 	void accumAdjust(unsigned int* obs, unsigned int size, float* gamma, float* digamma, AdjustmentAccumulator& accum);
 	void accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, float* gamma, float* digamma, AdjustmentAccumulator& accum);
 	float calcSeqProb(float* alpha, unsigned int size);
+	void testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const;
 
-
+	DataMapper native_symbolmap;
 	float *A, *B;
 	float *Pi;
 	unsigned int N, M;
