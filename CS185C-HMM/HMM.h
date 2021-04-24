@@ -19,6 +19,8 @@ public:
 	friend void pickle_hmm(HMM* hmm, std::string fpath);
 	friend void initialize_hmm(HMM* hmm, std::string fpath);
 	void setDataMapper(const DataMapper& o);
+	void testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const;
+	void generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest) const;
 
 private:
 	struct AdjustmentAccumulator {
@@ -91,7 +93,7 @@ private:
 	void accumAdjust(unsigned int* obs, unsigned int size, float* gamma, float* digamma, AdjustmentAccumulator& accum);
 	void accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, float* gamma, float* digamma, AdjustmentAccumulator& accum);
 	float calcSeqProb(float* alpha, unsigned int size);
-	void testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const;
+
 
 	DataMapper native_symbolmap;
 	float *A, *B;

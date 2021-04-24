@@ -21,6 +21,7 @@ DataMapper::DataMapper(const DataMapper& o):
 DataMapper& DataMapper::operator=(const DataMapper& o) {
 	raw_mapper = o.raw_mapper;
 	size = o.size;
+	return *this;
 }
 
 std::unordered_map<unsigned int, std::string> DataMapper::getReverseMap() const {

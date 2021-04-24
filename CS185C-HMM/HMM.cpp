@@ -623,7 +623,7 @@ void HMM::TrainingWorker::train_work() {
 		for (unsigned int i = 0; i < length; i++)
 			logProb += log(coeffs[i]);
 
-		accumulator->accumLogProb += -logProb;
+		accumulator->accumLogProb += -logProb*(1.0f/length);
 	}
 }
 
@@ -636,7 +636,7 @@ void HMM::TrainingWorker::valid_work() {
 		for (unsigned int i = 0; i < length; i++)
 			logProb += log(coeffs[i]);
 
-		accumulator->accumLogProb_v += -logProb;
+		accumulator->accumLogProb_v += -logProb * (1.0f / length);
 		accumulator->count++;
 	}
 }
@@ -666,9 +666,59 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 		float rating = 0.0f;
 		for (unsigned int j = 0; j < length; j++)
 			rating += log(coeffs[j]);
+		tp += -rating * (1.0f / length) >= thresh;
+		fn += -rating * (1.0f / length) < thresh;
+	}
 
-		tp += rating >= thresh;
-		fn += rating < thresh;
+	for (unsigned int i = 0; i < neg_size; i++) {
+		unsigned int length = neg_l[i];
+		alphaPass(neg_data[i], length, alpha, coeffs);
+
+		float rating = 0.0f;
+		for (unsigned int j = 0; j < length; j++)
+			rating += log(coeffs[j]);
+		tn += -rating * (1.0f / length) < thresh;
+		fp += -rating * (1.0f / length) >= thresh;
+	}
+
+	std::cout << "TPR: " << ((float)tp / (float)(tp + fp)) << std::endl;
+	std::cout << "FPR: " << ((float)fp / (float)(tp + fp)) << std::endl;
+	std::cout << "TNR: " << ((float)tn / (float)(tn + fn)) << std::endl;
+	std::cout << "FNR: " << ((float)fn / (float)(tn + fn)) << std::endl;
+
+	delete_array(alpha, max_t_size, N);
+	delete[] coeffs;
+}
+
+void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float * dest) const {
+	HMMDataSet remapped_pos = positives.getRemapped(native_symbolmap);
+	unsigned int** pos_data = remapped_pos.getDataPtr();
+	unsigned int* pos_l = remapped_pos.getLengthsPtr();
+	HMMDataSet remapped_neg = negatives.getRemapped(native_symbolmap);
+	unsigned int** neg_data = remapped_neg.getDataPtr();
+	unsigned int* neg_l = remapped_neg.getLengthsPtr();
+
+	unsigned int pos_size = remapped_pos.getSize();
+	unsigned int neg_size = remapped_neg.getSize();
+
+	unsigned int max_t_size = std::max(remapped_pos.getMaxLength(), remapped_neg.getMaxLength());
+	float* alpha = alloc_mat(max_t_size, N);
+	float* coeffs = alloc_vec(max_t_size);
+
+	std::vector<float> positive_probs;
+	std::vector<float> negative_probs;
+	// store a sorted array of 
+
+	for (unsigned int i = 0; i < pos_size; i++) {
+		unsigned int length = pos_l[i];
+		alphaPass(pos_data[i], length, alpha, coeffs);
+
+		float rating = 0.0f;
+		for (unsigned int j = 0; j < length; j++)
+			rating += log(coeffs[j]);
+
+		positive_probs.push_back(-rating);
+
 	}
 
 	for (unsigned int i = 0; i < neg_size; i++) {
@@ -679,8 +729,40 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 		for (unsigned int j = 0; j < length; j++)
 			rating += log(coeffs[j]);
 
-		tn += rating < thresh;
-		fp += rating >= thresh;
+		negative_probs.push_back(-rating);
+
+	}
+
+	std::sort(positive_probs.begin(), positive_probs.end());
+	std::sort(negative_probs.begin(), negative_probs.end());
+	unsigned int index = 0;
+	unsigned int j = 0;
+	for (unsigned int i = 0; i < pos_size; i++) {
+		float current_thresh = positive_probs[i];
+		while (negative_probs[j] < current_thresh) j++;
+		unsigned int TP = pos_size - i;
+		unsigned int FN = i;
+		unsigned int FP = neg_size - j;
+		unsigned int TN = j;
+		
+		dest[index] = (float)TP / (float)(TP + FP); // TPR
+		dest[index + 1] = 1 - dest[index]; // FPR
+		index += 2;
+	}
+
+	j = 0;
+	for (unsigned int i = 0; i < neg_size; i++) {
+		float current_thresh = negative_probs[i];
+
+		while (positive_probs[j] < current_thresh) j++;
+		unsigned int TP = pos_size - j;
+		unsigned int FN = j;
+		unsigned int FP = neg_size - i;
+		unsigned int TN = i;
+
+		dest[index] = (float)TP / (float)(TP + FP); // TPR
+		dest[index + 1] = 1 - dest[index]; // FPR
+		index += 2;
 	}
 
 	delete_array(alpha, max_t_size, N);
