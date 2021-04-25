@@ -415,6 +415,7 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 	last_validation_score = accum.accumLogProb_v;
 
 	for (unsigned int epoch = 0; epoch < iterations; epoch++) {
+		std::cout << "----------------------------------------- EPOCH " << epoch << " -----------------------------------------" << std::endl;
 		for (unsigned int i = 0; i < n_folds; i++) {
 			trainer.train_fold(i, &accum);
 
@@ -681,10 +682,8 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 		fp += -rating * (1.0f / length) >= thresh;
 	}
 
-	std::cout << "TPR: " << ((float)tp / (float)(tp + fp)) << std::endl;
-	std::cout << "FPR: " << ((float)fp / (float)(tp + fp)) << std::endl;
-	std::cout << "TNR: " << ((float)tn / (float)(tn + fn)) << std::endl;
-	std::cout << "FNR: " << ((float)fn / (float)(tn + fn)) << std::endl;
+	std::cout << "TPR: " << ((float)tp / (float)(tp + fn)) << std::endl;
+	std::cout << "FPR: " << ((float)fp / (float)(tn + fp)) << std::endl;
 
 	delete_array(alpha, max_t_size, N);
 	delete[] coeffs;
@@ -745,8 +744,8 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 		unsigned int FP = neg_size - j;
 		unsigned int TN = j;
 		
-		dest[index] = (float)TP / (float)(TP + FP); // TPR
-		dest[index + 1] = 1 - dest[index]; // FPR
+		dest[index] = (float)TP / (float)(TP + FN); // TPR
+		dest[index + 1] = (float)FP / (float)(TN + FP); // FPR
 		index += 2;
 	}
 
@@ -760,8 +759,8 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 		unsigned int FP = neg_size - i;
 		unsigned int TN = i;
 
-		dest[index] = (float)TP / (float)(TP + FP); // TPR
-		dest[index + 1] = 1 - dest[index]; // FPR
+		dest[index] = (float)TP / (float)(TP + FN); // TPR
+		dest[index + 1] = (float)FP / (float)(TN + FP); // FPR
 		index += 2;
 	}
 
