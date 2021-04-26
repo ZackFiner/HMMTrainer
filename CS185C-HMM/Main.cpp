@@ -10,26 +10,28 @@
 int main() {
 
 	NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess");
-	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess_stats.csv", 20);
+	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess_stats.csv", 30);
 	HMMDataSet winwebsec_dataset = HMMDataSet(&loader, winwebsec_mapper);
 	winwebsec_dataset.printExample(0);
 
-	/*
-	DefaultProbInit initializer(0.8f);
+	
+	DefaultProbInit initializer(0.99f);
 	HMM hmm = HMM(20, winwebsec_dataset.getSymbolCount(), &initializer);
-	hmm.trainModel(winwebsec_dataset, 5, 10);
-	pickle_hmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_20_20_za.hmm");
-	*/
+	hmm.trainModel(winwebsec_dataset, 100, 10);
+	//pickle_hmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_20_30_za.hmm");
 	
 	
-	HMM hmm(20, 20);
-	initialize_hmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_20_20_za.hmm");
+	/*
+	HMM hmm(20, 30);
+	initialize_hmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_20_30_za.hmm");
 	hmm.setDataMapper(winwebsec_mapper);
 	hmm.print_mats();
 	NewLineSeperatedLoader loader2 = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot");
 	DataMapper zbot_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot_stats.csv", 5000);
 	HMMDataSet zbot_dataset = HMMDataSet(&loader2, zbot_mapper);
 
+	
+	
 	hmm.testClassifier(winwebsec_dataset, zbot_dataset, -1.85f);
 	hmm.testClassifier(winwebsec_dataset, zbot_dataset, -1.90f);
 	hmm.testClassifier(winwebsec_dataset, zbot_dataset, -1.95f);
@@ -41,7 +43,7 @@ int main() {
 	hmm.testClassifier(winwebsec_dataset, zbot_dataset, -2.25f);
 	hmm.testClassifier(winwebsec_dataset, zbot_dataset, -2.30f);
 	hmm.testClassifier(winwebsec_dataset, zbot_dataset, -2.35f);
-	
+	*/
 	
 	/*
 	* // Pickling tests

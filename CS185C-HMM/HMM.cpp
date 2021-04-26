@@ -4,7 +4,8 @@
 #include "DataSet.h"
 #include <math.h>
 #include <thread>
-//#include <xmmintrin.h>
+#include <immintrin.h>
+#include <xmmintrin.h>
 
 HMM::HMM() {
 
@@ -203,8 +204,10 @@ void HMM::calcGamma(unsigned int* obs, unsigned int size, unsigned int t, float*
 		div = 1.0f / div;
 		for (unsigned int i = 0; i < N; i++) {
 			gamma[i] = 0.0f;
-			for (unsigned int j = 0; j < N; j++) {
+			unsigned int j = 0;
+			for (j = 0; j < N; j++) {
 				val = alpha[t*N + i] * A[i*N + j] * B[obs[t + 1]*N + j] * beta[(t + 1)*N + j] * div;
+				//_mm256_fmadd_ps()
 				digamma[i*N + j] = val;
 				gamma[i] += val;
 			}
@@ -394,7 +397,7 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, floa
 }
 
 
-void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigned int n_folds) {
+void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigned int n_folds, unsigned int fold_index, bool early_stop, unsigned int patience) {
 
 	NFoldIterator iter = dataset.getIter(n_folds);
 	AdjustmentAccumulator accum;
@@ -413,29 +416,35 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 	trainer.score_fold(0, &accum);
 	last_training_score = accum.accumLogProb;
 	last_validation_score = accum.accumLogProb_v;
+	unsigned int osc = 0;
 
 	for (unsigned int epoch = 0; epoch < iterations; epoch++) {
 		std::cout << "----------------------------------------- EPOCH " << epoch << " -----------------------------------------" << std::endl;
-		for (unsigned int i = 0; i < n_folds; i++) {
-			trainer.train_fold(i, &accum);
+
+		trainer.train_fold(fold_index, &accum);
 
 
-			applyAdjust(accum);
+		applyAdjust(accum);
 
-			// calculate the score improvement
-			trainer.score_fold(i, &accum);
-			float training_score_gain = accum.accumLogProb - last_training_score;
-			float validation_score_gain = accum.accumLogProb_v - last_validation_score;
+		// calculate the score improvement
+		trainer.score_fold(fold_index, &accum);
+		float training_score_gain = accum.accumLogProb - last_training_score;
+		float validation_score_gain = accum.accumLogProb_v - last_validation_score;
 
-			last_validation_score = accum.accumLogProb_v;
-			last_training_score = accum.accumLogProb;
-			print_vector(Pi, N);
-			print_matrix(A, N, N, false);
-			//print_matrix(B, M, N, false);
-			std::cout << "Training Score: " << accum.accumLogProb << std::endl;
-			std::cout << "Validation Score: " << accum.accumLogProb_v << std::endl;
+		last_validation_score = accum.accumLogProb_v;
+		last_training_score = accum.accumLogProb;
+		print_vector(Pi, N);
+		print_matrix(A, N, N, false);
+		//print_matrix(B, M, N, false);
+		std::cout << "Training Score: " << accum.accumLogProb << std::endl;
+		std::cout << "Validation Score: " << accum.accumLogProb_v << std::endl;
+		std::cout << "Training Improvement: " << training_score_gain << std::endl;
+		std::cout << "Validation Improvement: " << validation_score_gain << std::endl;
 
-		}
+		// early stopping
+		osc = validation_score_gain > 0 ? 0 : osc + (last_training_score > 0);
+		if (early_stop && patience < osc)
+			return;
 
 	}
 	std::cout << accum.accumLogProb_v << std::endl;

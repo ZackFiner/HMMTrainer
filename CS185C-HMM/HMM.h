@@ -14,7 +14,7 @@ public:
 	HMM(unsigned int _N, unsigned int _M, ProbInit* initializer = nullptr);
 	~HMM();
 	int* getIdealStateSequence(unsigned int* obs, unsigned int size);
-	void trainModel(const HMMDataSet& dataset, unsigned int iterations = 10, unsigned int n_folds = 10);
+	void trainModel(const HMMDataSet& dataset, unsigned int iterations = 10, unsigned int n_folds = 10, unsigned int fold_index = 0, bool early_stop = true, unsigned int patience = 1);
 	void print_mats() const;
 	friend void pickle_hmm(HMM* hmm, std::string fpath);
 	friend void initialize_hmm(HMM* hmm, std::string fpath);
