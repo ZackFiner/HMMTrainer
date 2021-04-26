@@ -173,11 +173,21 @@ void HMM::betaPass(unsigned int* obs, unsigned int size, float* beta, float* coe
 		unsigned int beta_idx = (t + 1) * N;
 		float ct = coeffs[t];
 		for (unsigned int i = 0; i < N; i++) {
-			float sum = 0;
+			float sum = 0.0f;
 			unsigned int row_idx = i * N;
-			for (unsigned int j = 0; j < N; j++)
-				sum += A[row_idx + j] * B[obs_idx + j] * beta[beta_idx + j];
+			unsigned int j = 0;
+			for (; j < N - 8; j += 8) {
+				__m256 a_v = _mm256_loadu_ps(&A[row_idx + j]);
+				__m256 b_v = _mm256_loadu_ps(&B[obs_idx + j]);
+				__m256 beta_v = _mm256_loadu_ps(&beta[beta_idx + j]);
+				__m256 prod = _mm256_mul_ps(a_v, b_v);
+				prod = _mm256_mul_ps(prod, beta_v);
 
+				sum += fastsum8_m256(prod);
+			}
+			for (; j < N; j++) {
+				sum += A[row_idx + j] * B[obs_idx + j] * beta[beta_idx + j];
+			}
 			beta[cur_beta_idx + i] = sum*ct;
 		}
 	}
@@ -212,6 +222,7 @@ void HMM::calcGamma(unsigned int* obs, unsigned int size, float* alpha, float* b
 	for (unsigned int i = 0; i < N; i++)
 		gamma[(size - 1)*N + i] = alpha[(size - 1)*N + i] * div;
 }
+
 
 void HMM::calcGamma(unsigned int* obs, unsigned int size, unsigned int t, float* alpha, float* beta, float* gamma, float* digamma) {
 	float div = 1e-10f;
