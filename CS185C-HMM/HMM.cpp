@@ -202,13 +202,45 @@ void HMM::calcGamma(unsigned int* obs, unsigned int size, unsigned int t, float*
 			}
 		}
 		div = 1.0f / div;
+
+		__m256 div_v = _mm256_broadcast_ss(&div);
 		for (unsigned int i = 0; i < N; i++) {
 			gamma[i] = 0.0f;
+			__m256 alpha_v = _mm256_broadcast_ss(&alpha[t * N + i]);
+			
 			unsigned int j = 0;
-			for (j = 0; j < N; j++) {
-				val = alpha[t*N + i] * A[i*N + j] * B[obs[t + 1]*N + j] * beta[(t + 1)*N + j] * div;
-				//_mm256_fmadd_ps()
-				digamma[i*N + j] = val;
+			for (j = 0; j < N; j+=8) {
+				// digamma calculation for 8 elements
+				__m256 a_v = _mm256_loadu_ps(&A[i * N + j]);
+				__m256 prod1 = _mm256_mul_ps(alpha_v, a_v);
+				prod1 = _mm256_mul_ps(prod1, div_v);
+				__m256 b_v = _mm256_loadu_ps(&B[obs[t + 1] * N + j]);
+				__m256 beta_v = _mm256_loadu_ps(&beta[(t + 1) * N + j]);
+				__m256 prod2 = _mm256_mul_ps(b_v, beta_v);
+				prod1 = _mm256_mul_ps(prod1, prod2);
+
+				_mm256_storeu_ps(&digamma[i * N + j], prod1); // update digamma
+				
+				// sum calculation for gamma
+				// fold 1
+				__m128 hi = _mm256_extractf128_ps(prod1, 1); // take out the top 4 floats
+				__m128 lo = _mm256_castps256_ps128(prod1); // take out the bottom 4 floats
+				hi = _mm_add_ps(hi, lo); // sum the top with the bottom, assign to hi
+				// fold 2
+				lo = _mm_unpacklo_ps(hi, hi); // lo = [h1, h1, h2, h2]
+				hi = _mm_unpackhi_ps(hi, hi); // hi = [h3, h3, h4, h4]
+				hi = _mm_add_ps(hi, lo); // hi = [h1+h3, h1+h3, h2+h4, h2+h4]
+				// fold 3
+				lo = _mm_unpacklo_ps(hi, hi); // lo = [h1+h3, h1+h3, h1+h3, h1+h3]
+				hi = _mm_unpackhi_ps(hi, hi); // hi = [h2+h4, h2+h4, h2+h4, h2+h4]
+				hi = _mm_add_ps(hi, lo); // all 4 entires contain the sum
+				// to obtain the sum of all elements, we simply need to extract the first and second element of hi and add them:
+				gamma[i] += _mm_cvtss_f32(hi);
+			}
+			j -= 8;
+			for (; j < N; j++) {
+				val = alpha[t * N + i] * A[i * N + j] * B[obs[t + 1] * N + j] * beta[(t + 1) * N + j] * div;
+				digamma[i * N + j] = val;
 				gamma[i] += val;
 			}
 		}
