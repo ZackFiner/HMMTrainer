@@ -1,4 +1,5 @@
 #include "HmmUtil.h"
+#include "MatUtil.h"
 #include "HMM.h"
 #include <fstream>
 #include <iostream>
@@ -61,7 +62,8 @@ void initialize_hmm(HMM* hmm, std::string fpath) {
 			hmm->A[i*N + j] = f_buff;
 		}
 	}
-
+	
+	transpose_emplace(hmm->A, N, N, hmm->A_T);
 	for (unsigned int i = 0; i < M; i++) {
 		for (unsigned int j = 0; j < N; j++) {
 			file.read((char*)&f_buff, sizeof(float));
