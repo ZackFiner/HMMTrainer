@@ -350,7 +350,14 @@ void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
 
 	for (unsigned int i = 0; i < N; i++) {
 		unsigned int row_ind = i * N;
-		for (unsigned int j = 0; j < N; j++) {
+		unsigned int j = 0;
+		for (j = 0; j < N-8; j+=8) {
+			__m256 digamma_v = _mm256_loadu_ps(&accum.A_digamma_accum[row_ind + j]);
+			__m256 gamma_v = _mm256_loadu_ps(&accum.A_gamma_accum[row_ind + j]);
+			_mm256_storeu_ps(&this->A[row_ind + j], _mm256_div_ps(digamma_v, gamma_v));
+		}
+
+		for (; j < N; j++) {
 			unsigned int col_ind = row_ind + j;
 			this->A[col_ind] = accum.A_digamma_accum[col_ind] / accum.A_gamma_accum[col_ind];// assign our new transition probability for Aij
 		}
@@ -358,7 +365,13 @@ void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
 
 	for (unsigned int i = 0; i < N; i++) {
 		unsigned int row_ind = i * M;
-		for (unsigned int k = 0; k < M; k++) {
+		unsigned int k = 0;
+		for (k = 0; k < M-8; k+=8) {
+			__m256 obs_v = _mm256_loadu_ps(&accum.B_obs_accum[row_ind + k]);
+			__m256 gamma_v = _mm256_loadu_ps(&accum.B_gamma_accum[row_ind + k]);
+			_mm256_storeu_ps(&this->B[row_ind + k], _mm256_div_ps(obs_v, gamma_v));
+		}
+		for (; k < M; k++) {
 			unsigned int col_ind = row_ind + k;
 			this->B[col_ind] = accum.B_obs_accum[col_ind] / accum.B_gamma_accum[col_ind]; //re-estimate our Bik
 		}
