@@ -16,6 +16,13 @@ float* transpose(float* mat, unsigned int N, unsigned int M) {
 	return t_mat;
 }
 
+void transpose_emplace(float* mat, unsigned int N, unsigned int M, float* dest) {
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int j = 0; j < M; j++)
+			dest[j * N + i] = mat[i * M + j];
+	}
+}
+
 void delete_array(float* mat, unsigned int N, unsigned int M) {
 	if (!mat)
 		return;

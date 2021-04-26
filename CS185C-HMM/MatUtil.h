@@ -2,6 +2,7 @@
 #include <iostream>
 #include <string>
 float* transpose(float* mat, unsigned int N, unsigned int M);
+void transpose_emplace(float* mat, unsigned int N, unsigned int M, float* dest);
 void delete_array(float* mat, unsigned int N, unsigned int M);
 void delete_array3(float* arr, unsigned int N, unsigned int M, unsigned int R);
 float* alloc_mat(unsigned int N, unsigned int M);

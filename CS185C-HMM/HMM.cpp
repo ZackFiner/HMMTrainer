@@ -13,6 +13,7 @@ HMM::HMM() {
 
 HMM::HMM(float* _A, float* _B, float* _Pi, unsigned int _N, unsigned int _M) {
 	this->A = _A;
+	this->A_T = transpose(this->A, _N, _N);
 	this->B = transpose(_B, _N, _M);
 	delete_array(_B, _N, _M);
 	this->Pi = _Pi;
@@ -26,7 +27,7 @@ HMM::HMM(unsigned int _N, unsigned int _M, ProbInit* initializer) {
 	ProbInit* init = initializer ? initializer : &def_init;
 	this->A = init->AInit(_N);
 	this->B = init->BInit(_N, _M);
-	
+	this->A_T = transpose(this->A, _N, _N);
 	float* T_B = transpose(this->B, _N, _M); // transpose our B array for simplified processing
 	delete_array(this->B, _N, _M);
 	this->B = T_B;
@@ -40,6 +41,7 @@ HMM::HMM(unsigned int _N, unsigned int _M, ProbInit* initializer) {
 HMM::~HMM() {
 	delete_array(this->A, N, N);
 	delete_array(this->B, M, N); // remember, B is transposed
+	delete_array(this->A_T, N, N);
 	delete[] this->Pi;
 }
 
@@ -115,7 +117,15 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 	float val;
 	coeffs[0] = 0.0f;
 	unsigned int obs_idx = obs[0] * N;
-	for (unsigned int i = 0; i < N; i++) {
+	unsigned int i = 0;
+	for (; i < N-8; i+=8) {
+		__m256 pi_v = _mm256_loadu_ps(&Pi[i]);
+		__m256 b_v = _mm256_loadu_ps(&B[obs_idx + i]);
+		__m256 prod = _mm256_mul_ps(pi_v, b_v);
+		_mm256_storeu_ps(&alpha[i], prod);
+		coeffs[0] += fastsum8_m256(prod);
+	}
+	for (; i < N; i++) {
 		val = Pi[i] * B[obs_idx + i];
 		alpha[/* 0*N+ */i] = val; // B has been transposed to improve spatial locality
 		coeffs[0] += val;
@@ -123,19 +133,32 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 	
 	float div = 1.0f / coeffs[0];
 	coeffs[0] = div;
-	for (unsigned int i = 0; i < N; i++) // scale the values s.t. alpha[0][0] + alpha[0][1] + ... = 1
-		alpha[/* 0*N+ */i] *= div;
+	__m256 div_v = _mm256_broadcast_ss(&div);
+	for (i = 0; i < N - 8; i += 8) { // scale the values s.t. alpha[0][0] + alpha[0][1] + ... = 1
+		__m256 prod = _mm256_loadu_ps(&alpha[i]);
+		prod = _mm256_mul_ps(prod, div_v); // alpha[i...i+7] = alpha[i...i+7] * div
+		_mm256_storeu_ps(&alpha[i], prod);
+	}
+	for (; i < N; i++)
+		alpha[i] *= div;
 
 	for (unsigned int t = 1; t < size; t++) {
 		coeffs[t] = 0.0f;
 		unsigned int last_alpha_idx = (t - 1) * N;
 		unsigned int cur_alpha_idx = t * N;
 		obs_idx = obs[t] * N;
-		for (unsigned int i = 0; i < N; i++) {
+		for (i = 0; i < N; i++) {
 			float sum = 0;
-			for (unsigned int j = 0; j < N; j++) {
-				sum += alpha[last_alpha_idx + j] * A[j*N + i]; // probability that we'd see the previous hidden state * the probability we'd transition to this new hidden state
+			unsigned int j = 0;
+			for (; j < N-8; j+=8) {
+				__m256 alpha_v = _mm256_loadu_ps(&alpha[last_alpha_idx + j]);
+				__m256 a_v = _mm256_loadu_ps(&A_T[i * N + j]);
+				__m256 prod = _mm256_mul_ps(alpha_v, a_v);
+				sum += fastsum8_m256(prod);
 			}
+			for(; j < N; j++)
+				sum += alpha[last_alpha_idx + j] * A_T[i*N + j]; // probability that we'd see the previous hidden state * the probability we'd transition to this new hidden state
+
 			val = sum * B[obs_idx + i];
 			alpha[cur_alpha_idx + i] = val;
 			coeffs[t] += val;
@@ -144,8 +167,16 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 
 		div = 1.0f / coeffs[t];
 		coeffs[t] = div;
-		for (unsigned int i = 0; i < N; i++)  // scale the values s.t. alpha[t][0] + alpha[t][1] + ... = 1
+		div_v = _mm256_broadcast_ss(&div);
+		for (i=0; i < N - 8; i += 8) {
+			__m256 prod = _mm256_loadu_ps(&alpha[cur_alpha_idx + i]);
+			prod = _mm256_mul_ps(prod, div_v); // alpha[i...i+7] = alpha[i...i+7] * div
+			_mm256_storeu_ps(&alpha[cur_alpha_idx + i], prod);
+		}
+
+		for (; i < N; i++)  // scale the values s.t. alpha[t][0] + alpha[t][1] + ... = 1
 			alpha[cur_alpha_idx + i] *= div;
+
 
 	}
 	
@@ -332,6 +363,8 @@ void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
 			this->B[col_ind] = accum.B_obs_accum[col_ind] / accum.B_gamma_accum[col_ind]; //re-estimate our Bik
 		}
 	}
+
+	transpose_emplace(this->A, N, N, this->A_T);
 }
 
 HMM::AdjustmentAccumulator::~AdjustmentAccumulator() {

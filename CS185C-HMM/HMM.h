@@ -96,7 +96,7 @@ private:
 
 
 	DataMapper native_symbolmap;
-	float *A, *B;
+	float *A, *B, *A_T;
 	float *Pi;
 	unsigned int N, M;
 
