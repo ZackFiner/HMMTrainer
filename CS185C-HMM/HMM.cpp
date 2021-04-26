@@ -469,14 +469,31 @@ void HMM::print_mats() const {
 
 void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, float* gamma, float* digamma, AdjustmentAccumulator& accum) {
 	if (t == 0) {
-		for (unsigned int i = 0; i < N; i++) {
+		unsigned int i = 0;
+		for (; i < N-8; i+=8) {
+			__m256 pi_v = _mm256_loadu_ps(&accum.pi_accum[i]);
+			__m256 gamma_v = _mm256_loadu_ps(&gamma[i]);
+			_mm256_storeu_ps(&accum.pi_accum[i], _mm256_add_ps(pi_v, gamma_v));
+		}
+		for (; i < N; i++) {
 			accum.pi_accum[i] += gamma[i]; // use our calculated initial probability from gamma
 		}
 	}
 	if (t < size - 1) {
 		for (unsigned int i = 0; i < N; i++) {
 			unsigned int row_ind = i * N;
-			for (unsigned int j = 0; j < N; j++) {
+			__m256 gamma_v = _mm256_broadcast_ss(&gamma[i]);
+			unsigned int j = 0;
+			for (; j < N-8; j+=8) {
+				unsigned int col_ind = row_ind + j;
+				__m256 numer_o = _mm256_loadu_ps(&accum.A_digamma_accum[col_ind]);
+				__m256 numer_n = _mm256_loadu_ps(&digamma[col_ind]);
+				__m256 denom_o = _mm256_loadu_ps(&accum.A_gamma_accum[col_ind]);
+
+				_mm256_storeu_ps(&accum.A_digamma_accum[col_ind], _mm256_add_ps(numer_o, numer_n));
+				_mm256_storeu_ps(&accum.A_gamma_accum[col_ind], _mm256_add_ps(denom_o, gamma_v));
+			}
+			for (; j < N; j++) {
 				unsigned int col_ind = row_ind + j;
 				accum.A_digamma_accum[col_ind] += digamma[col_ind];
 				accum.A_gamma_accum[col_ind] += gamma[i];
@@ -485,11 +502,23 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, floa
 		}
 		for (unsigned int k = 0; k < M; k++) {
 			unsigned int row_ind = k * N;
-			for (unsigned int i = 0; i < N; i++) {
+			float mult = obs[t] == k ? 1.0f : 0.0f;
+			unsigned int i = 0;
+			/*for (; i < N-8; i+=8) { // for some reason, this seems to hinder training performance, idk if it's due to rounding issues or what
+				unsigned int col_ind = row_ind + i;
+				__m256 denom_o = _mm256_loadu_ps(&accum.B_gamma_accum[col_ind]);
+				__m256 numer_o = _mm256_loadu_ps(&accum.B_obs_accum[col_ind]);
+				__m256 denom_n = _mm256_broadcast_ss(&gamma[i]);
+				__m256 numer_n = obs[t] == k ? _mm256_add_ps(numer_o, denom_n) : numer_o;
+
+				_mm256_storeu_ps(&accum.B_gamma_accum[col_ind], _mm256_add_ps(denom_o, denom_n));
+				_mm256_storeu_ps(&accum.B_obs_accum[col_ind], numer_n);
+			}*/
+			for (; i < N; i++) {
 				unsigned int col_ind = row_ind + i;
 				float cur_gamma = gamma[i];
 				accum.B_gamma_accum[col_ind] += cur_gamma;
-				accum.B_obs_accum[col_ind] += obs[t] == k ? cur_gamma : 0.0f;
+				accum.B_obs_accum[col_ind] += cur_gamma*mult;
 
 			}
 		}

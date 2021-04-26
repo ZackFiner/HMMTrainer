@@ -16,9 +16,9 @@ int main() {
 
 	
 	DefaultProbInit initializer(0.99f);
-	HMM hmm = HMM(20, winwebsec_dataset.getSymbolCount(), &initializer);
+	HMM hmm = HMM(50, winwebsec_dataset.getSymbolCount(), &initializer);
 	hmm.trainModel(winwebsec_dataset, 100, 10);
-	//pickle_hmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_20_30_za.hmm");
+	pickle_hmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_50_30_za.hmm");
 	
 	
 	/*
