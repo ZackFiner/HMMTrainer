@@ -12,15 +12,21 @@ public:
 	HMM();
 	HMM(float* _A, float* _B, float* _Pi, unsigned int _N, unsigned int _M);
 	HMM(unsigned int _N, unsigned int _M, ProbInit* initializer = nullptr);
+	HMM(const HMM&);
+	HMM& operator=(const HMM&);
 	~HMM();
 	int* getIdealStateSequence(unsigned int* obs, unsigned int size);
 	void trainModel(const HMMDataSet& dataset, unsigned int iterations = 10, unsigned int n_folds = 10, unsigned int fold_index = 0, bool early_stop = true, unsigned int patience = 1);
 	void print_mats() const;
+	void reset(ProbInit* initializer);
 	friend void pickle_hmm(HMM* hmm, std::string fpath);
 	friend void initialize_hmm(HMM* hmm, std::string fpath);
+	friend HMM load_hmm(std::string fpath);
 	void setDataMapper(const DataMapper& o);
 	void testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const;
 	void generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest) const;
+	unsigned int getM();
+	unsigned int getN();
 
 private:
 	struct AdjustmentAccumulator {

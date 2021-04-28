@@ -54,6 +54,7 @@ public:
 	unsigned int getSymbolCount() const;
 	unsigned int** getDataPtr() const;
 	unsigned int* getLengthsPtr() const;
+	HMMDataSet& operator=(const HMMDataSet& o);
 	HMMDataSet getRemapped(const DataMapper& other) const;
 private:
 	void bufferData(DataLoader* loader);

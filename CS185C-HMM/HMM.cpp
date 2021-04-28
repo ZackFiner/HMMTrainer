@@ -22,6 +22,31 @@ HMM::HMM(float* _A, float* _B, float* _Pi, unsigned int _N, unsigned int _M) {
 	this->M = _M;
 }
 
+HMM::HMM(const HMM& o): native_symbolmap(o.native_symbolmap) {
+	this->N = o.N;
+	this->M = o.M;
+	this->A = alloc_mat(o.A, N, N);
+	this->A_T = alloc_mat(o.A_T, N, N);
+	this->B = alloc_mat(o.B, M, N);
+	this->Pi = alloc_vec(o.Pi, N);
+}
+
+HMM& HMM::operator=(const HMM& o) {
+	delete_array(A, N, N);
+	delete_array(A_T, N, N);
+	delete_array(B, M, N);
+	delete[] Pi;
+
+	native_symbolmap = o.native_symbolmap;
+	this->N = o.N;
+	this->M = o.M;
+	this->A = alloc_mat(o.A, N, N);
+	this->A_T = alloc_mat(o.A_T, N, N);
+	this->B = alloc_mat(o.B, M, N);
+	this->Pi = alloc_vec(o.Pi, N);
+	return *this;
+}
+
 HMM::HMM(unsigned int _N, unsigned int _M, ProbInit* initializer) {
 	DefaultProbInit def_init;
 	ProbInit* init = initializer ? initializer : &def_init;
@@ -43,6 +68,27 @@ HMM::~HMM() {
 	delete_array(this->B, M, N); // remember, B is transposed
 	delete_array(this->A_T, N, N);
 	delete[] this->Pi;
+}
+
+unsigned int HMM::getM() { return M; }
+unsigned int HMM::getN() { return N; }
+
+void HMM::reset(ProbInit* initializer) {
+	delete_array(this->A, N, N);
+	delete_array(this->B, M, N); // remember, B is transposed
+	delete_array(this->A_T, N, N);
+	delete[] this->Pi;
+
+	DefaultProbInit def_init;
+	ProbInit* init = initializer ? initializer : &def_init;
+	this->A = init->AInit(N);
+	this->B = init->BInit(N, M);
+	this->A_T = transpose(this->A, N, N);
+	float* T_B = transpose(this->B, N, M); // transpose our B array for simplified processing
+	delete_array(this->B, N, M);
+	this->B = T_B;
+
+	this->Pi = init->PiIinit(N);
 }
 
 int HMM::getStateAtT(float* gamma, unsigned int size, unsigned int t) {
@@ -118,6 +164,7 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 	coeffs[0] = 0.0f;
 	unsigned int obs_idx = obs[0] * N;
 	unsigned int i = 0;
+	if (N > 8)
 	for (; i < N-8; i+=8) {
 		__m256 pi_v = _mm256_loadu_ps(&Pi[i]);
 		__m256 b_v = _mm256_loadu_ps(&B[obs_idx + i]);
@@ -134,7 +181,9 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 	float div = 1.0f / coeffs[0];
 	coeffs[0] = div;
 	__m256 div_v = _mm256_broadcast_ss(&div);
-	for (i = 0; i < N - 8; i += 8) { // scale the values s.t. alpha[0][0] + alpha[0][1] + ... = 1
+	i = 0;
+	if (N > 8)
+	for (; i < N - 8; i += 8) { // scale the values s.t. alpha[0][0] + alpha[0][1] + ... = 1
 		__m256 prod = _mm256_loadu_ps(&alpha[i]);
 		prod = _mm256_mul_ps(prod, div_v); // alpha[i...i+7] = alpha[i...i+7] * div
 		_mm256_storeu_ps(&alpha[i], prod);
@@ -150,6 +199,7 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 		for (i = 0; i < N; i++) {
 			float sum = 0;
 			unsigned int j = 0;
+			if (N > 8)
 			for (; j < N-8; j+=8) {
 				__m256 alpha_v = _mm256_loadu_ps(&alpha[last_alpha_idx + j]);
 				__m256 a_v = _mm256_loadu_ps(&A_T[i * N + j]);
@@ -168,7 +218,9 @@ void HMM::alphaPass(unsigned int* obs, unsigned int size, float* alpha, float* c
 		div = 1.0f / coeffs[t];
 		coeffs[t] = div;
 		div_v = _mm256_broadcast_ss(&div);
-		for (i=0; i < N - 8; i += 8) {
+		i = 0;
+		if (N > 8)
+		for (; i < N - 8; i += 8) {
 			__m256 prod = _mm256_loadu_ps(&alpha[cur_alpha_idx + i]);
 			prod = _mm256_mul_ps(prod, div_v); // alpha[i...i+7] = alpha[i...i+7] * div
 			_mm256_storeu_ps(&alpha[cur_alpha_idx + i], prod);
@@ -207,6 +259,7 @@ void HMM::betaPass(unsigned int* obs, unsigned int size, float* beta, float* coe
 			float sum = 0.0f;
 			unsigned int row_idx = i * N;
 			unsigned int j = 0;
+			if (N > 8)
 			for (; j < N - 8; j += 8) {
 				__m256 a_v = _mm256_loadu_ps(&A[row_idx + j]);
 				__m256 b_v = _mm256_loadu_ps(&B[obs_idx + j]);
@@ -262,6 +315,7 @@ void HMM::calcGamma(unsigned int* obs, unsigned int size, unsigned int t, float*
 		for (unsigned int i = 0; i < N; i++) {
 			__m256 alpha_v = _mm256_broadcast_ss(&alpha[t * N + i]);
 			unsigned int j = 0;
+			if (N > 8)
 			for (j = 0; j < N - 8; j+=8) {
 
 				// compute the un-normalized digamma values and assign them to digamma
@@ -284,6 +338,7 @@ void HMM::calcGamma(unsigned int* obs, unsigned int size, unsigned int t, float*
 		for (unsigned int i = 0; i < N; i++) {
 			gamma[i] = 0.0f;
 			unsigned int j = 0;
+			if (N > 8)
 			for (j = 0; j < N-8; j+=8) {
 				// digamma calculation for 8 elements
 				__m256 prod1 = _mm256_loadu_ps(&digamma[i*N + j]);
@@ -351,6 +406,7 @@ void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
 	for (unsigned int i = 0; i < N; i++) {
 		unsigned int row_ind = i * N;
 		unsigned int j = 0;
+		if (N > 8)
 		for (j = 0; j < N-8; j+=8) {
 			__m256 digamma_v = _mm256_loadu_ps(&accum.A_digamma_accum[row_ind + j]);
 			__m256 gamma_v = _mm256_loadu_ps(&accum.A_gamma_accum[row_ind + j]);
@@ -366,6 +422,7 @@ void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
 	for (unsigned int i = 0; i < N; i++) {
 		unsigned int row_ind = i * M;
 		unsigned int k = 0;
+		if (M > 8)
 		for (k = 0; k < M-8; k+=8) {
 			__m256 obs_v = _mm256_loadu_ps(&accum.B_obs_accum[row_ind + k]);
 			__m256 gamma_v = _mm256_loadu_ps(&accum.B_gamma_accum[row_ind + k]);
@@ -470,6 +527,7 @@ void HMM::print_mats() const {
 void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, float* gamma, float* digamma, AdjustmentAccumulator& accum) {
 	if (t == 0) {
 		unsigned int i = 0;
+		if (N > 8)
 		for (; i < N-8; i+=8) {
 			__m256 pi_v = _mm256_loadu_ps(&accum.pi_accum[i]);
 			__m256 gamma_v = _mm256_loadu_ps(&gamma[i]);
@@ -484,6 +542,7 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, floa
 			unsigned int row_ind = i * N;
 			__m256 gamma_v = _mm256_broadcast_ss(&gamma[i]);
 			unsigned int j = 0;
+			if (N > 8)
 			for (; j < N-8; j+=8) {
 				unsigned int col_ind = row_ind + j;
 				__m256 numer_o = _mm256_loadu_ps(&accum.A_digamma_accum[col_ind]);
@@ -828,6 +887,8 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 }
 
 void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float * dest) const {
+
+	std::cout << "debug1" << std::endl;
 	HMMDataSet remapped_pos = positives.getRemapped(native_symbolmap);
 	unsigned int** pos_data = remapped_pos.getDataPtr();
 	unsigned int* pos_l = remapped_pos.getLengthsPtr();
@@ -846,6 +907,7 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 	std::vector<float> negative_probs;
 	// store a sorted array of 
 
+	std::cout << "debug2" << std::endl;
 	for (unsigned int i = 0; i < pos_size; i++) {
 		unsigned int length = pos_l[i];
 		alphaPass(pos_data[i], length, alpha, coeffs);
@@ -870,6 +932,7 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 
 	}
 
+	std::cout << "debug3" << std::endl;
 	std::sort(positive_probs.begin(), positive_probs.end());
 	std::sort(negative_probs.begin(), negative_probs.end());
 	unsigned int index = 0;
@@ -902,6 +965,7 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 		index += 2;
 	}
 
+	std::cout << "debug4" << std::endl;
 	delete_array(alpha, max_t_size, N);
 	delete[] coeffs;
 }

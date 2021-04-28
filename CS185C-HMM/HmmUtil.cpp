@@ -73,3 +73,34 @@ void initialize_hmm(HMM* hmm, std::string fpath) {
 	file.close();
 
 }
+
+HMM load_hmm(std::string fpath) {
+	unsigned int M, N;
+
+	std::ifstream file(fpath, std::ios::binary);
+	file.read((char*)&M, sizeof(unsigned int));
+	file.read((char*)&N, sizeof(unsigned int));
+	HMM r_hmm(N, M);
+	float f_buff;
+	for (unsigned int i = 0; i < N; i++) {
+		file.read((char*)&f_buff, sizeof(float));
+		r_hmm.Pi[i] = f_buff;
+	}
+	for (unsigned int i = 0; i < N; i++) {
+		for (unsigned int j = 0; j < N; j++) {
+			file.read((char*)&f_buff, sizeof(float));
+			r_hmm.A[i * N + j] = f_buff;
+		}
+	}
+
+	transpose_emplace(r_hmm.A, N, N, r_hmm.A_T);
+	for (unsigned int i = 0; i < M; i++) {
+		for (unsigned int j = 0; j < N; j++) {
+			file.read((char*)&f_buff, sizeof(float));
+			r_hmm.B[i * N + j] = f_buff;
+		}
+	}
+	file.close();
+
+	return r_hmm;
+}

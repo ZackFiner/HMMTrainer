@@ -105,6 +105,31 @@ HMMDataSet::HMMDataSet(const HMMDataSet& o) {
 	max_length = o.max_length;
 }
 
+HMMDataSet& HMMDataSet::operator=(const HMMDataSet& o) {
+	if (data) {
+		for (unsigned int i = 0; i < size; i++) {
+			delete[] data[i];
+		}
+		delete[] data;
+
+		delete[] lengths;
+	}
+
+	data = new unsigned int* [o.size];
+	lengths = new unsigned int[o.size];
+
+	for (unsigned int i = 0; i < o.size; i++) {
+		unsigned int l = o.lengths[i];
+		lengths[i] = l;
+		data[i] = new unsigned int[lengths[i]];
+		for (unsigned int j = 0; j < l; j++)
+			data[i][j] = o.data[i][j];
+	}
+	size = o.size;
+	symbol_map = o.symbol_map;
+	max_length = o.max_length;
+}
+
 HMMDataSet::~HMMDataSet() {
 	if (data) {
 		for (unsigned int i = 0; i < size; i++) {
