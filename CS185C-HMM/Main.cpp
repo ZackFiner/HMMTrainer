@@ -11,19 +11,10 @@
 
 int main() {
 
-#define N 6
-#define M 14
-	float arr[11330];
-	char* dset1 = (char*)"K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess";
-	size_t len1 = strlen(dset1);
-	char* dset2 = (char*)"K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\winwebsec";
-	size_t len2 = strlen(dset2);
-	char* hmm_fp = (char*)"K:\\GitHub\\CS185C-HMM\\hmms\\zeroaccess\\N_series\\hmm_3_10_za_fold0.hmm";
-	size_t len3 = strlen(hmm_fp);
+#define N 10
+#define M 125
 
-	getRoc(arr, 11330, dset1, len1, dset2, len2, hmm_fp, len3);
-
-	/*NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess");
+	NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess");
 	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess_stats.csv", M);
 	HMMDataSet winwebsec_dataset = HMMDataSet(&loader, winwebsec_mapper);
 	winwebsec_dataset.printExample(0);
@@ -39,7 +30,7 @@ int main() {
 		pickle_hmm(&hmm, s.str());
 		hmm.reset(&initializer);
 	}
-	*/
+	
 	/*
 	HMM hmm(50, 30);
 	initialize_hmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_50_30_za.hmm");
