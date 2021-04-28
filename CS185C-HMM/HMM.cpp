@@ -888,7 +888,6 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 
 void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float * dest) const {
 
-	std::cout << "debug1" << std::endl;
 	HMMDataSet remapped_pos = positives.getRemapped(native_symbolmap);
 	unsigned int** pos_data = remapped_pos.getDataPtr();
 	unsigned int* pos_l = remapped_pos.getLengthsPtr();
@@ -907,14 +906,13 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 	std::vector<float> negative_probs;
 	// store a sorted array of 
 
-	std::cout << "debug2" << std::endl;
 	for (unsigned int i = 0; i < pos_size; i++) {
 		unsigned int length = pos_l[i];
 		alphaPass(pos_data[i], length, alpha, coeffs);
 
 		float rating = 0.0f;
 		for (unsigned int j = 0; j < length; j++)
-			rating += log(coeffs[j]);
+			rating += log(coeffs[j]) * (1.0f / length);
 
 		positive_probs.push_back(-rating);
 
@@ -926,14 +924,15 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 
 		float rating = 0.0f;
 		for (unsigned int j = 0; j < length; j++)
-			rating += log(coeffs[j]);
+			rating += log(coeffs[j]) * (1.0f / length);
 
 		negative_probs.push_back(-rating);
 
 	}
 
-	std::cout << "debug3" << std::endl;
 	std::sort(positive_probs.begin(), positive_probs.end());
+	for (auto debug : positive_probs)
+		std::cout << debug << std::endl;
 	std::sort(negative_probs.begin(), negative_probs.end());
 	unsigned int index = 0;
 	unsigned int j = 0;
@@ -949,7 +948,7 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 		dest[index + 1] = (float)FP / (float)(TN + FP); // FPR
 		index += 2;
 	}
-
+	
 	j = 0;
 	for (unsigned int i = 0; i < neg_size; i++) {
 		float current_thresh = negative_probs[i];
@@ -965,7 +964,6 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 		index += 2;
 	}
 
-	std::cout << "debug4" << std::endl;
 	delete_array(alpha, max_t_size, N);
 	delete[] coeffs;
 }

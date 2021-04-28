@@ -128,6 +128,8 @@ HMMDataSet& HMMDataSet::operator=(const HMMDataSet& o) {
 	size = o.size;
 	symbol_map = o.symbol_map;
 	max_length = o.max_length;
+
+	return *this;
 }
 
 HMMDataSet::~HMMDataSet() {
