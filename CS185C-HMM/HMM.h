@@ -24,7 +24,7 @@ public:
 	friend HMM load_hmm(std::string fpath);
 	void setDataMapper(const DataMapper& o);
 	void testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const;
-	void generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest) const;
+	void generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest, unsigned int eval_size = 0) const;
 	unsigned int getM();
 	unsigned int getN();
 

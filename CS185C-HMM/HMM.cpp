@@ -886,7 +886,7 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 	delete[] coeffs;
 }
 
-void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float * dest) const {
+void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest, unsigned int eval_size) const {
 
 	HMMDataSet remapped_pos = positives.getRemapped(native_symbolmap);
 	unsigned int** pos_data = remapped_pos.getDataPtr();
@@ -907,53 +907,53 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 	// store a sorted array of 
 
 	for (unsigned int i = 0; i < pos_size; i++) {
-		unsigned int length = pos_l[i];
+		unsigned int length = eval_size ? std::min(eval_size, pos_l[i]) : pos_l[i];
 		alphaPass(pos_data[i], length, alpha, coeffs);
 
 		float rating = 0.0f;
+		float div = eval_size ? 1.0f : (1.0f / (float)length);
 		for (unsigned int j = 0; j < length; j++)
-			rating += log(coeffs[j]) * (1.0f / length);
+			rating += log(coeffs[j]) * div;
 
 		positive_probs.push_back(-rating);
 
 	}
 
 	for (unsigned int i = 0; i < neg_size; i++) {
-		unsigned int length = neg_l[i];
+		unsigned int length = eval_size ? std::min(eval_size, neg_l[i]) : neg_l[i];
 		alphaPass(neg_data[i], length, alpha, coeffs);
 
 		float rating = 0.0f;
+		float div = eval_size ? 1.0f : (1.0f / (float)length);
 		for (unsigned int j = 0; j < length; j++)
-			rating += log(coeffs[j]) * (1.0f / length);
+			rating += log(coeffs[j]) * div;
 
 		negative_probs.push_back(-rating);
 
 	}
 
 	std::sort(positive_probs.begin(), positive_probs.end());
-	for (auto debug : positive_probs)
-		std::cout << debug << std::endl;
 	std::sort(negative_probs.begin(), negative_probs.end());
 	unsigned int index = 0;
 	unsigned int j = 0;
 	for (unsigned int i = 0; i < pos_size; i++) {
 		float current_thresh = positive_probs[i];
-		while (negative_probs[j] < current_thresh) j++;
+		while (negative_probs[j] < current_thresh && (j < neg_size - 1)) j++;
 		unsigned int TP = pos_size - i;
 		unsigned int FN = i;
 		unsigned int FP = neg_size - j;
 		unsigned int TN = j;
-		
+
 		dest[index] = (float)TP / (float)(TP + FN); // TPR
 		dest[index + 1] = (float)FP / (float)(TN + FP); // FPR
 		index += 2;
 	}
-	
+
 	j = 0;
 	for (unsigned int i = 0; i < neg_size; i++) {
 		float current_thresh = negative_probs[i];
 
-		while (positive_probs[j] < current_thresh) j++;
+		while (positive_probs[j] < current_thresh && (j < pos_size-1)) j++;
 		unsigned int TP = pos_size - j;
 		unsigned int FN = j;
 		unsigned int FP = neg_size - i;
