@@ -967,3 +967,51 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 	delete_array(alpha, max_t_size, N);
 	delete[] coeffs;
 }
+
+void HMM::evaluateModel(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest, unsigned int eval_size = 0) const {
+	
+	HMMDataSet remapped_pos = positives.getRemapped(native_symbolmap);
+	unsigned int** pos_data = remapped_pos.getDataPtr();
+	unsigned int* pos_l = remapped_pos.getLengthsPtr();
+	HMMDataSet remapped_neg = negatives.getRemapped(native_symbolmap);
+	unsigned int** neg_data = remapped_neg.getDataPtr();
+	unsigned int* neg_l = remapped_neg.getLengthsPtr();
+
+	unsigned int pos_size = remapped_pos.getSize();
+	unsigned int neg_size = remapped_neg.getSize();
+
+	unsigned int max_t_size = std::max(remapped_pos.getMaxLength(), remapped_neg.getMaxLength());
+	float* alpha = alloc_mat(max_t_size, N);
+	float* coeffs = alloc_vec(max_t_size);
+
+	// store a sorted array of 
+
+	for (unsigned int i = 0; i < pos_size; i++) {
+		unsigned int length = eval_size ? std::min(eval_size, pos_l[i]) : pos_l[i];
+		alphaPass(pos_data[i], length, alpha, coeffs);
+
+		float rating = 0.0f;
+		float div = eval_size ? 1.0f : (1.0f / (float)length);
+		for (unsigned int j = 0; j < length; j++)
+			rating += log(coeffs[j]) * div;
+
+		dest[i] = -rating;
+	}
+
+	for (unsigned int i = 0; i < neg_size; i++) {
+		unsigned int length = eval_size ? std::min(eval_size, neg_l[i]) : neg_l[i];
+		alphaPass(neg_data[i], length, alpha, coeffs);
+
+		float rating = 0.0f;
+		float div = eval_size ? 1.0f : (1.0f / (float)length);
+		for (unsigned int j = 0; j < length; j++)
+			rating += log(coeffs[j]) * div;
+
+		dest[pos_size + i] = -rating;
+	}
+
+	
+
+	delete_array(alpha, max_t_size, N);
+	delete[] coeffs;
+}

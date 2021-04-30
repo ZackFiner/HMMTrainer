@@ -11,11 +11,11 @@
 
 int main() {
 
-#define N 6
-#define M 17
+#define N 10
+#define M 20
 
-	NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\winwebsec");
-	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\winwebsec_stats.csv", M);
+	NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot");
+	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot_stats.csv", M);
 	HMMDataSet winwebsec_dataset = HMMDataSet(&loader, winwebsec_mapper);
 	winwebsec_dataset.printExample(0);
 
@@ -26,7 +26,7 @@ int main() {
 		hmm.trainModel(winwebsec_dataset, 100, 10, i, true, 1);
 		std::ostringstream s;
 		s.str("");
-		s << "K:\\GitHub\\CS185C-HMM\\hmms\\winwebsec\\M_series\\hmm_" << N << "_"<< M << "_ww_fold"<< i << ".hmm";
+		s << "K:\\GitHub\\CS185C-HMM\\hmms\\zbot\\N_series\\hmm_" << N << "_"<< M << "_zb_fold"<< i << ".hmm";
 		pickle_hmm(&hmm, s.str());
 		hmm.reset(&initializer);
 	}
