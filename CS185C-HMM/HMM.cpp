@@ -442,7 +442,8 @@ HMM::AdjustmentAccumulator::~AdjustmentAccumulator() {
 	delete_array(this->A_gamma_accum, N, N);
 	delete_array(this->B_gamma_accum, M, N);
 	delete_array(this->B_obs_accum, M, N);
-	delete[] this->pi_accum;
+	if (this->pi_accum)
+		delete[] this->pi_accum;
 	this->initialized = false;
 }
 
@@ -592,7 +593,7 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 	accum.initialize(N, M);
 	unsigned int max_length = dataset.getMaxLength();
 	
-	NFoldTrainingManager trainer;
+	HMMThreadManager trainer;
 	trainer.data = dataset.getDataPtr();
 	trainer.lengths = dataset.getLengthsPtr();
 	trainer.case_count = dataset.getSize();
@@ -638,7 +639,7 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 	std::cout << accum.accumLogProb_v << std::endl;
 }
 
-void HMM::NFoldTrainingManager::multi_thread_fold(unsigned int nfold, unsigned int _N, unsigned int _M, HMM* _hmm, unsigned int max_sequence_length) {
+void HMM::HMMThreadManager::multi_thread_fold(unsigned int nfold, unsigned int _N, unsigned int _M, HMM* _hmm, unsigned int max_sequence_length) {
 	std::vector<unsigned int**> fold_regions;
 	std::vector<unsigned int*> fold_region_lengths;
 	std::vector<unsigned int> fold_region_sizes;
@@ -688,12 +689,14 @@ void HMM::NFoldTrainingManager::multi_thread_fold(unsigned int nfold, unsigned i
 	}
 }
 
-HMM::NFoldTrainingManager::~NFoldTrainingManager() {
-	delete[] accumulators;
-	delete[] workers;
+HMM::HMMThreadManager::~HMMThreadManager() {
+	if (accumulators)
+		delete[] accumulators;
+	if (workers)
+		delete[] workers;
 }
 
-void HMM::NFoldTrainingManager::score_fold(unsigned int fold_index, AdjustmentAccumulator* master) {
+void HMM::HMMThreadManager::score_fold(unsigned int fold_index, AdjustmentAccumulator* master) {
 	std::vector<std::thread> threads;
 	for (unsigned int i = 0; i < fold_count; i++) {
 		accumulators[i].reset();
@@ -720,7 +723,7 @@ void HMM::NFoldTrainingManager::score_fold(unsigned int fold_index, AdjustmentAc
 	}
 }
 
-void HMM::NFoldTrainingManager::train_fold(unsigned int fold_index, AdjustmentAccumulator* master) {
+void HMM::HMMThreadManager::train_fold(unsigned int fold_index, AdjustmentAccumulator* master) {
 	std::vector<std::thread> threads;
 	for (unsigned int i = 0; i < fold_count; i++) {
 		accumulators[i].reset();
@@ -767,6 +770,65 @@ void HMM::NFoldTrainingManager::train_fold(unsigned int fold_index, AdjustmentAc
 	}
 }
 
+void HMM::HMMThreadManager::evaluate_datasets(
+	const HMMDataSet& positives,
+	const HMMDataSet& negatives,
+	float* dest,
+	unsigned int eval_length
+) {
+	// unpack the dataset parameters we need
+	HMMDataSet remapped_pos = positives.getRemapped(hmm->native_symbolmap);
+	unsigned int** pos_data = remapped_pos.getDataPtr();
+	unsigned int* pos_l = remapped_pos.getLengthsPtr();
+	HMMDataSet remapped_neg = negatives.getRemapped(hmm->native_symbolmap);
+	unsigned int** neg_data = remapped_neg.getDataPtr();
+	unsigned int* neg_l = remapped_neg.getLengthsPtr();
+
+	unsigned int pos_size = remapped_pos.getSize();
+	unsigned int neg_size = remapped_neg.getSize();
+	unsigned int pos_fold_size = pos_size / 10;
+	unsigned int neg_fold_size = neg_size / 10;
+	unsigned int max_t_size = std::max(remapped_pos.getMaxLength(), remapped_neg.getMaxLength());
+
+	// initialize workers
+	float* cur_fold_l = dest;
+	EvaluationWorker eval_workers[20];
+	unsigned int** fold_ptr = pos_data;
+	unsigned int* fold_l = pos_l;
+	unsigned int entries = 0;
+	for (unsigned int i = 0; i < 9; i++) {
+		eval_workers[i].initialize(cur_fold_l, hmm, max_t_size, fold_ptr, fold_l, pos_fold_size);
+		cur_fold_l += pos_fold_size;
+		fold_ptr += pos_fold_size;
+		fold_l += pos_fold_size;
+		entries += pos_fold_size;
+
+	}
+
+	eval_workers[9].initialize(cur_fold_l, hmm, max_t_size, fold_ptr, fold_l, pos_size - entries);
+	cur_fold_l += (pos_size - entries);
+	
+	fold_ptr = neg_data;
+	fold_l = neg_l;
+	entries = 0;
+	for (unsigned int i = 10; i < 19; i++) {
+		eval_workers[i].initialize(cur_fold_l, hmm, max_t_size, fold_ptr, fold_l, neg_fold_size);
+		cur_fold_l += neg_fold_size;
+		fold_ptr += neg_fold_size;
+		fold_l += neg_fold_size;
+		entries += neg_fold_size;
+	}
+	eval_workers[19].initialize(cur_fold_l, hmm, max_t_size, fold_ptr, fold_l, neg_size - entries);
+
+	// run workers
+	std::vector<std::thread> threads;
+	for (unsigned int i = 0; i < 20; i++)
+		threads.emplace_back(std::thread(&(HMM::EvaluationWorker::evaluate_region), (HMM::EvaluationWorker*)&eval_workers[i], eval_length));
+	for (auto& thread : threads)
+		thread.join();
+}
+
+
 void HMM::TrainingWorker::initialize(
 	unsigned int** _case_data,
 	unsigned int* _case_lengths,
@@ -794,6 +856,32 @@ void HMM::TrainingWorker::initialize(
 	gamma = alloc_vec(N);
 	digamma = alloc_mat(N, N);
 	coeffs = alloc_vec(sequence_count);
+}
+
+void HMM::EvaluationWorker::initialize(
+	float* _dest,
+	HMM* _hmm,
+	unsigned int _max_length,
+	unsigned int** _case_data,
+	unsigned int* _case_lengths,
+	unsigned int _case_count
+) {
+	dest = _dest;
+	hmm = _hmm;
+	N = hmm->getN();
+	M = hmm->getM();
+	max_length = _max_length;
+	case_data = _case_data;
+	case_lengths = _case_lengths;
+	case_count = _case_count;
+
+	alpha = alloc_mat(max_length, N);
+	coeffs = alloc_vec(max_length);
+}
+
+HMM::EvaluationWorker::~EvaluationWorker() {
+	delete_array(alpha, max_length, N);
+	delete[] coeffs;
 }
 
 HMM::TrainingWorker::~TrainingWorker() {
@@ -839,6 +927,19 @@ void HMM::TrainingWorker::valid_work() {
 	}
 }
 
+void HMM::EvaluationWorker::evaluate_region(unsigned int eval_length) {
+	for (unsigned int i = 0; i < case_count; i++) {
+		unsigned int length = eval_length ? std::min(eval_length, case_lengths[i]) : case_lengths[i];
+		hmm->alphaPass(case_data[i], length, alpha, coeffs);
+
+		float rating = 0.0f;
+		float div = eval_length ? 1.0f : (1.0f / (float)length);
+		for (unsigned int j = 0; j < length; j++)
+			rating += log(coeffs[j]) * div;
+
+		dest[i] = -rating;
+	}
+}
 
 void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const {
 	HMMDataSet remapped_pos = positives.getRemapped(native_symbolmap);
@@ -968,50 +1069,8 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 	delete[] coeffs;
 }
 
-void HMM::evaluateModel(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest, unsigned int eval_size = 0) const {
-	
-	HMMDataSet remapped_pos = positives.getRemapped(native_symbolmap);
-	unsigned int** pos_data = remapped_pos.getDataPtr();
-	unsigned int* pos_l = remapped_pos.getLengthsPtr();
-	HMMDataSet remapped_neg = negatives.getRemapped(native_symbolmap);
-	unsigned int** neg_data = remapped_neg.getDataPtr();
-	unsigned int* neg_l = remapped_neg.getLengthsPtr();
-
-	unsigned int pos_size = remapped_pos.getSize();
-	unsigned int neg_size = remapped_neg.getSize();
-
-	unsigned int max_t_size = std::max(remapped_pos.getMaxLength(), remapped_neg.getMaxLength());
-	float* alpha = alloc_mat(max_t_size, N);
-	float* coeffs = alloc_vec(max_t_size);
-
-	// store a sorted array of 
-
-	for (unsigned int i = 0; i < pos_size; i++) {
-		unsigned int length = eval_size ? std::min(eval_size, pos_l[i]) : pos_l[i];
-		alphaPass(pos_data[i], length, alpha, coeffs);
-
-		float rating = 0.0f;
-		float div = eval_size ? 1.0f : (1.0f / (float)length);
-		for (unsigned int j = 0; j < length; j++)
-			rating += log(coeffs[j]) * div;
-
-		dest[i] = -rating;
-	}
-
-	for (unsigned int i = 0; i < neg_size; i++) {
-		unsigned int length = eval_size ? std::min(eval_size, neg_l[i]) : neg_l[i];
-		alphaPass(neg_data[i], length, alpha, coeffs);
-
-		float rating = 0.0f;
-		float div = eval_size ? 1.0f : (1.0f / (float)length);
-		for (unsigned int j = 0; j < length; j++)
-			rating += log(coeffs[j]) * div;
-
-		dest[pos_size + i] = -rating;
-	}
-
-	
-
-	delete_array(alpha, max_t_size, N);
-	delete[] coeffs;
+void HMM::evaluateModel(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest, unsigned int eval_size) {
+	HMMThreadManager manager;
+	manager.hmm = this;
+	manager.evaluate_datasets(positives, negatives, dest, eval_size);
 }

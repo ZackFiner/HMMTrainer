@@ -26,18 +26,18 @@ public:
 
 	void testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const;
 	void generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest, unsigned int eval_size = 0) const;
-	void evaluateModel(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest, unsigned int eval_size = 0) const;
+	void evaluateModel(const HMMDataSet& positives, const HMMDataSet& negatives, float* dest, unsigned int eval_size = 0);
 
 	unsigned int getM();
 	unsigned int getN();
 
 private:
 	struct AdjustmentAccumulator {
-		float* A_gamma_accum;
-		float* A_digamma_accum;
-		float* B_gamma_accum;
-		float* B_obs_accum;
-		float* pi_accum;
+		float* A_gamma_accum = nullptr;
+		float* A_digamma_accum = nullptr;
+		float* B_gamma_accum = nullptr;
+		float* B_obs_accum = nullptr;
+		float* pi_accum = nullptr;
 		unsigned int N, M, count;
 		float accumLogProb;
 		float accumLogProb_v;
@@ -47,6 +47,7 @@ private:
 		~AdjustmentAccumulator();
 
 	};
+
 	struct TrainingWorker {
 		void initialize(
 			unsigned int** _case_data,
@@ -73,8 +74,23 @@ private:
 		~TrainingWorker();
 	};
 
-	struct NFoldTrainingManager {
-		AdjustmentAccumulator* accumulators;
+	struct EvaluationWorker {
+		float* dest;
+		HMM* hmm;
+		float* coeffs = nullptr, * alpha = nullptr;
+		unsigned int max_length, N, M;
+		unsigned int** case_data;
+		unsigned int* case_lengths;
+		unsigned int case_count;
+
+		void initialize(float* _dest, HMM* _hmm, unsigned int _max_length, unsigned int** _case_data, unsigned int* _case_lengths, unsigned int _case_count);
+		void evaluate_region(unsigned int eval_length = 0);
+		~EvaluationWorker();
+
+	};
+
+	struct HMMThreadManager {
+		AdjustmentAccumulator* accumulators = nullptr;
 		unsigned int** data;
 		unsigned int* lengths;
 		unsigned int case_count;
@@ -82,11 +98,16 @@ private:
 		unsigned int M;
 		unsigned int fold_count;
 		HMM* hmm;
-		TrainingWorker* workers;
+		TrainingWorker* workers = nullptr;
 		void multi_thread_fold(unsigned int nfold, unsigned int _N, unsigned int _M, HMM* _hmm, unsigned int max_sequence_length);
 		void train_fold(unsigned int fold_index, AdjustmentAccumulator* master);
 		void score_fold(unsigned int fold_index, AdjustmentAccumulator* master);
-		~NFoldTrainingManager();
+		void evaluate_datasets(
+			const HMMDataSet& positives, 
+			const HMMDataSet& negatives, 
+			float* dest,
+			unsigned int eval_length = 0);
+		~HMMThreadManager();
 	};
 
 
