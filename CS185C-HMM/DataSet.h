@@ -11,6 +11,8 @@ public:
 	DataMapper(const DataMapper& o);
 	unsigned int getVal(const std::string& v) const;
 	unsigned int getSymbolCount() const;
+	DataMapper& operator=(const DataMapper& o);
+	std::unordered_map<unsigned int, std::string> getReverseMap() const;
 private:
 	std::unordered_map<std::string, unsigned int> raw_mapper; // this should be 1:1 for now
 	unsigned int size;
@@ -43,6 +45,7 @@ class HMMDataSet
 public:
 	HMMDataSet();
 	HMMDataSet(DataLoader* loader, const DataMapper& mapper);
+	HMMDataSet(const HMMDataSet& o);
 	~HMMDataSet();
 	NFoldIterator getIter(unsigned int nfolds) const;
 	int getSize() const;
@@ -51,11 +54,13 @@ public:
 	unsigned int getSymbolCount() const;
 	unsigned int** getDataPtr() const;
 	unsigned int* getLengthsPtr() const;
+	HMMDataSet& operator=(const HMMDataSet& o);
+	HMMDataSet getRemapped(const DataMapper& other) const;
 private:
 	void bufferData(DataLoader* loader);
 	DataMapper symbol_map;
-	unsigned int** data; // raw 2d array of byte sequences
-	unsigned int* lengths; // array of record lengths
+	unsigned int** data = nullptr; // raw 2d array of byte sequences
+	unsigned int* lengths = nullptr; // array of record lengths
 	unsigned int max_length; // i don't want to re-allocate every time i load a new example
 	int size;
 	friend class NFoldIterator;

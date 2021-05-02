@@ -18,6 +18,21 @@ DataMapper::DataMapper(const DataMapper& o):
 	size(o.size)
 {}
 
+DataMapper& DataMapper::operator=(const DataMapper& o) {
+	raw_mapper = o.raw_mapper;
+	size = o.size;
+	return *this;
+}
+
+std::unordered_map<unsigned int, std::string> DataMapper::getReverseMap() const {
+	std::unordered_map<unsigned int, std::string> r_val;
+
+	for (std::pair<std::string, unsigned int> ele : raw_mapper)
+		r_val[ele.second] = ele.first;
+
+	return r_val;
+}
+
 unsigned int DataMapper::getSymbolCount() const {
 	return size;
 }
@@ -60,6 +75,7 @@ bool NewLineSeperatedLoader::hasNext() {
 
 HMMDataSet::HMMDataSet(): 
 	data(nullptr), 
+	lengths(nullptr),
 	size(0),
 	max_length(0)
 {
@@ -73,11 +89,58 @@ HMMDataSet::HMMDataSet(DataLoader* loader, const DataMapper& mapper) :
 	bufferData(loader);
 }
 
-HMMDataSet::~HMMDataSet() {
-	for (unsigned int i = 0; i < size; i++) {
-		delete[] data[i];
+HMMDataSet::HMMDataSet(const HMMDataSet& o) {
+	data = new unsigned int* [o.size];
+	lengths = new unsigned int[o.size];
+
+	for (unsigned int i = 0; i < o.size; i++) {
+		unsigned int l = o.lengths[i];
+		lengths[i] = l;
+		data[i] = new unsigned int[lengths[i]];
+		for (unsigned int j = 0; j < l; j++)
+			data[i][j] = o.data[i][j];
 	}
-	delete[] data;
+	size = o.size;
+	symbol_map = o.symbol_map;
+	max_length = o.max_length;
+}
+
+HMMDataSet& HMMDataSet::operator=(const HMMDataSet& o) {
+	if (data) {
+		for (unsigned int i = 0; i < size; i++) {
+			delete[] data[i];
+		}
+		delete[] data;
+
+		delete[] lengths;
+	}
+
+	data = new unsigned int* [o.size];
+	lengths = new unsigned int[o.size];
+
+	for (unsigned int i = 0; i < o.size; i++) {
+		unsigned int l = o.lengths[i];
+		lengths[i] = l;
+		data[i] = new unsigned int[lengths[i]];
+		for (unsigned int j = 0; j < l; j++)
+			data[i][j] = o.data[i][j];
+	}
+	size = o.size;
+	symbol_map = o.symbol_map;
+	max_length = o.max_length;
+
+	return *this;
+}
+
+HMMDataSet::~HMMDataSet() {
+	if (data) {
+		for (unsigned int i = 0; i < size; i++) {
+			delete[] data[i];
+		}
+		delete[] data;
+
+		delete[] lengths;
+	}
 }
 
 void HMMDataSet::bufferData(DataLoader* loader) {
@@ -146,6 +209,23 @@ unsigned int* HMMDataSet::getLengthsPtr() const {
 NFoldIterator HMMDataSet::getIter(unsigned int nfolds) const {
 	return NFoldIterator(*this, nfolds);
 }
+
+HMMDataSet HMMDataSet::getRemapped(const DataMapper& mapper) const {
+	std::unordered_map<unsigned int, std::string> reverse_mapper = symbol_map.getReverseMap(); // integer -> opcode_string
+	
+	HMMDataSet r_set(*this); // copy the dataset in question
+
+	for (unsigned int i = 0; i < r_set.size; i++) {
+		unsigned int l = r_set.lengths[i];
+		for (unsigned int j = 0; j < l; j++) {
+			r_set.data[i][j] = mapper.getVal(reverse_mapper[r_set.data[i][j]]); // re-map the dataset according to the new mapping
+		}
+	}
+	r_set.symbol_map = mapper;
+
+	return r_set;
+}
+
 
 NFoldIterator::NFoldIterator(const HMMDataSet& _loader, unsigned int _nfolds): loader(_loader) {
 	nfolds = _nfolds;

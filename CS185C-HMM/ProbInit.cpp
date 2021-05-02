@@ -10,25 +10,21 @@ DefaultProbInit::DefaultProbInit(float _variance) {
 	this->variance = _variance; // this should be > 0 and < 1
 }
 
-float** DefaultProbInit::AInit(unsigned int N) {
-	float** new_A = new float* [N];
-	for (unsigned int i = 0; i < N; i++)
-		new_A[i] = new float[N];
+float* DefaultProbInit::AInit(unsigned int N) {
+	float* new_A = new float [N*N];
 
 	for (unsigned int i = 0; i < N; i++) {
-		this->initializeStochasticRow(new_A[i], N);
+		this->initializeStochasticRow(&new_A[i*N], N);
 	}
 
 	return new_A;
 }
 
-float** DefaultProbInit::BInit(unsigned int N, unsigned int M) {
-	float** new_B = new float* [N];
-	for (unsigned int i = 0; i < N; i++)
-		new_B[i] = new float[M];
+float* DefaultProbInit::BInit(unsigned int N, unsigned int M) {
+	float* new_B = new float [N*M];
 
 	for (unsigned int i = 0; i < N; i++) {
-		this->initializeStochasticRow(new_B[i], M);
+		this->initializeStochasticRow(&new_B[i*M], M);
 	}
 
 	return new_B;
