@@ -2,6 +2,7 @@ import ctypes
 import numpy as np
 import pandas as pd
 from sklearn import metrics
+import matplotlib.pyplot as plt
 
 hmm_dll = ctypes.WinDLL("K:\\GitHub\\CS185C-HMM\\x64\\dll\\CS185C-HMM.dll")
 
@@ -161,6 +162,36 @@ def plot_fold_rocs(fold_data, hmm, negatives, n, m):
     roc.legend()
     return fig, roc
 
+def get_accuracy(pos_set, neg_set, thresh):
+    pos_set = np.sort(pos_set)
+    pos_set_l = pos_set.shape[0]
+    neg_set = np.sort(neg_set)
+    neg_set_l = neg_set.shape[0]
+    
+    total_size_div = 1/(len(pos_set) + len(neg_set))
+    best_accuracy = 0
+    best_sens = 0
+    best_spec = 0
+    
+    i = 0
+    while(pos_set[i] <= thresh and i < (pos_set_l-1)):  # find the number of entries less than or equal to 
+        i+=1                                               # the threshold in pos set
+        
+    
+    j = 0
+    while(neg_set[j] <= thresh and j < (neg_set_l-1)): # find the number of entries less than or equal to 
+        j+=1                                              # the thershold in neg set
+        
+    TP = pos_set_l - i
+    FP = neg_set_l - j
+    TN = j
+    FN = i
+    best_accuracy = (TP + TN) * total_size_div
+    best_sens = TP / pos_set_l
+    best_spec = TN / neg_set_l
+
+    return best_accuracy, best_spec, best_sens
+
 def get_ideal_accuracy(pos_set, neg_set):
     pos_set = np.sort(pos_set)
     pos_set_l = pos_set.shape[0]
@@ -240,7 +271,7 @@ def get_data_analysis(fold_data, hmm, negatives, n, m):
 def plot_scatter(fold_data, fold_index, hmm, negatives, n, m):
     fig, scatter = plt.subplots(1)
     fig.suptitle("{hmm} vs. {negatives} (N={n}, m={m})".format(hmm=hmm[0], negatives=negatives[0], n=n, m=m))
-    scatter.set_title("Scatter Plot")
+    scatter.set_title("Scatter Plot (fold {i})".format(i=fold_index))
     scatter.set_ylabel('LogProb(O|model)/|O|')
     fold = fold_data[fold_index]
     pos_size = int(np.sum(fold[0]))

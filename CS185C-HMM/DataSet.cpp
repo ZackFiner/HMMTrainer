@@ -211,14 +211,14 @@ NFoldIterator HMMDataSet::getIter(unsigned int nfolds) const {
 }
 
 HMMDataSet HMMDataSet::getRemapped(const DataMapper& mapper) const {
-	std::unordered_map<unsigned int, std::string> reverse_mapper = symbol_map.getReverseMap();
+	std::unordered_map<unsigned int, std::string> reverse_mapper = symbol_map.getReverseMap(); // integer -> opcode_string
 	
-	HMMDataSet r_set(*this);
+	HMMDataSet r_set(*this); // copy the dataset in question
 
 	for (unsigned int i = 0; i < r_set.size; i++) {
 		unsigned int l = r_set.lengths[i];
 		for (unsigned int j = 0; j < l; j++) {
-			r_set.data[i][j] = mapper.getVal(reverse_mapper[r_set.data[i][j]]);
+			r_set.data[i][j] = mapper.getVal(reverse_mapper[r_set.data[i][j]]); // re-map the dataset according to the new mapping
 		}
 	}
 	r_set.symbol_map = mapper;
