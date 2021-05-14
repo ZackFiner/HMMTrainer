@@ -26,7 +26,7 @@ void getRoc(
 	std::string dataset_file1 = std::string(dset1);
 	std::string dataset_file2 = std::string(dset2);
 	std::string hmm_file = std::string(hmm_fp);
-	HMM tester = load_hmm(hmm_file);
+	HMM tester = loadHmm(hmm_file);
 
 	DataMapper mapper1 = generateDataMapFromStats(mapper_file1, tester.getM());
 	tester.setDataMapper(mapper1);
@@ -92,7 +92,7 @@ void scoreModelFolds(float* arr,
 		factory << hmm_file << "\\" << test_series_s << "\\hmm_" << N << "_" << M << "_" << abrv_s << "_fold" << i << ".hmm";
 		std::string hmm_file_path = factory.str();
 		factory.str("");
-		initialize_hmm(&tester, hmm_file_path);
+		initializeHmm(&tester, hmm_file_path);
 		tester.generateROC(positive_dataset, negative_dataset, fold_head, eval_size);
 		fold_head += fold_size;
 	}
@@ -144,7 +144,7 @@ void evaluateModelFolds(float* arr,
 		factory << hmm_file << "\\" << test_series_s << "\\hmm_" << N << "_" << M << "_" << abrv_s << "_fold" << i << ".hmm";
 		std::string hmm_file_path = factory.str();
 		factory.str("");
-		initialize_hmm(&tester, hmm_file_path);
+		initializeHmm(&tester, hmm_file_path);
 		tester.evaluateModel(positive_dataset, negative_dataset, fold_head, eval_size);
 		fold_head += fold_size;
 	}

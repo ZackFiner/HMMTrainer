@@ -16,40 +16,40 @@ float* transpose(float* mat, unsigned int N, unsigned int M) {
 	return t_mat;
 }
 
-void transpose_emplace(float* mat, unsigned int N, unsigned int M, float* dest) {
+void transposeEmplace(float* mat, unsigned int N, unsigned int M, float* dest) {
 	for (unsigned int i = 0; i < N; i++) {
 		for (unsigned int j = 0; j < M; j++)
 			dest[j * N + i] = mat[i * M + j];
 	}
 }
 
-void delete_array(float* mat, unsigned int N, unsigned int M) {
+void deleteArray(float* mat, unsigned int N, unsigned int M) {
 	if (!mat)
 		return;
 
 	delete[] mat;
 }
 
-void delete_array3(float* arr, unsigned int N, unsigned int M, unsigned int R) {
+void deleteArray3(float* arr, unsigned int N, unsigned int M, unsigned int R) {
 	if (!arr)
 		return;
 
 	delete[] arr;
 }
 
-float* alloc_mat(unsigned int N, unsigned int M) {
+float* allocMat(unsigned int N, unsigned int M) {
 	float* r_val = new float [N*M];
 
 	return r_val;
 }
 
-float* alloc_mat3(unsigned int N, unsigned int M, unsigned int R) {
+float* allocMat3(unsigned int N, unsigned int M, unsigned int R) {
 	float* r_val = new float [N*M*R];
 
 	return r_val;
 }
 
-float get_max_abs(float* mat, unsigned int N, unsigned int M) {
+float getMaxAbs(float* mat, unsigned int N, unsigned int M) {
 	float abs_max = 0.0f;
 	for (unsigned int i = 0; i < N; i++) {
 		for (unsigned int j = 0; j < M; j++) {
@@ -61,7 +61,7 @@ float get_max_abs(float* mat, unsigned int N, unsigned int M) {
 	return abs_max;
 }
 
-float get_max_abs(float* vec, unsigned int N) {
+float getMaxAbs(float* vec, unsigned int N) {
 	float abs_max = 0.0f;
 	for (unsigned int i = 0; i < N; i++) {
 		float v = vec[i];
@@ -71,7 +71,7 @@ float get_max_abs(float* vec, unsigned int N) {
 	return abs_max;
 }
 
-float* alloc_mat(float* init, unsigned int N, unsigned int M) {
+float* allocMat(float* init, unsigned int N, unsigned int M) {
 	float* r_val = new float [N*M];
 
 	for (unsigned int i = 0; i < N; i++)
@@ -82,20 +82,20 @@ float* alloc_mat(float* init, unsigned int N, unsigned int M) {
 }
 
 
-float* alloc_vec(unsigned int N) {
+float* allocVec(unsigned int N) {
 	return new float[N];
 }
 
-float* alloc_vec(float* init, unsigned int N) {
+float* allocVec(float* init, unsigned int N) {
 	float* r_val = new float[N];
 	for (unsigned int i = 0; i < N; i++)
 		r_val[i] = init[i];
 	return r_val;
 }
 
-void print_matrix(float* mat, unsigned int N, unsigned int M, bool transpose, unsigned int prec) {
+void printMatrix(float* mat, unsigned int N, unsigned int M, bool transpose, unsigned int prec) {
 
-	float abs_max = get_max_abs(mat, N, M);
+	float abs_max = getMaxAbs(mat, N, M);
 	std::ostringstream converter;
 	converter.precision(prec);
 	converter << std::fixed << abs_max;
@@ -128,9 +128,9 @@ void print_matrix(float* mat, unsigned int N, unsigned int M, bool transpose, un
 
 }
 
-void print_vector(float* vec, unsigned int N, unsigned int prec) {
+void printVector(float* vec, unsigned int N, unsigned int prec) {
 
-	float abs_max = get_max_abs(vec, N);
+	float abs_max = getMaxAbs(vec, N);
 	std::ostringstream converter;
 	converter.precision(prec);
 	converter << std::fixed << abs_max;

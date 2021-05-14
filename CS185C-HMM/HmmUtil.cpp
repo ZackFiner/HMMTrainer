@@ -4,7 +4,7 @@
 #include <fstream>
 #include <iostream>
 
-void pickle_hmm(HMM* hmm, std::string fpath) {
+void pickleHmm(HMM* hmm, std::string fpath) {
 	unsigned int N, M, index;
 	N = hmm->N;
 	M = hmm->M;
@@ -40,7 +40,7 @@ void pickle_hmm(HMM* hmm, std::string fpath) {
 	delete[] buffer;
 }
 
-void initialize_hmm(HMM* hmm, std::string fpath) {
+void initializeHmm(HMM* hmm, std::string fpath) {
 	unsigned int M, N;
 
 	std::ifstream file(fpath, std::ios::binary);
@@ -63,7 +63,7 @@ void initialize_hmm(HMM* hmm, std::string fpath) {
 		}
 	}
 	
-	transpose_emplace(hmm->A, N, N, hmm->A_T);
+	transposeEmplace(hmm->A, N, N, hmm->A_T);
 	for (unsigned int i = 0; i < M; i++) {
 		for (unsigned int j = 0; j < N; j++) {
 			file.read((char*)&f_buff, sizeof(float));
@@ -74,7 +74,7 @@ void initialize_hmm(HMM* hmm, std::string fpath) {
 
 }
 
-HMM load_hmm(std::string fpath) {
+HMM loadHmm(std::string fpath) {
 	unsigned int M, N;
 
 	std::ifstream file(fpath, std::ios::binary);
@@ -93,7 +93,7 @@ HMM load_hmm(std::string fpath) {
 		}
 	}
 
-	transpose_emplace(r_hmm.A, N, N, r_hmm.A_T);
+	transposeEmplace(r_hmm.A, N, N, r_hmm.A_T);
 	for (unsigned int i = 0; i < M; i++) {
 		for (unsigned int j = 0; j < N; j++) {
 			file.read((char*)&f_buff, sizeof(float));

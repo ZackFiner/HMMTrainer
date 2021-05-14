@@ -33,9 +33,9 @@ int main() {
 	
 	
 	HMM hmm(50, 30);
-	initialize_hmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_50_30_za.hmm");
+	initializeHmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_50_30_za.hmm");
 	hmm.setDataMapper(winwebsec_mapper);
-	hmm.print_mats();
+	hmm.printMats();
 	NewLineSeperatedLoader loader2 = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess");
 	DataMapper zbot_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zeroaccess_stats.csv", 5000);
 	HMMDataSet zbot_dataset = HMMDataSet(&loader2, zbot_mapper);

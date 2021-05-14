@@ -36,6 +36,9 @@
     <ClCompile Include="Source.cpp">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="HMMTrainers.cpp">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="HMM.h">
@@ -54,6 +57,9 @@
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Master.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="HMMTrainers.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

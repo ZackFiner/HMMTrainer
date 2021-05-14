@@ -17,11 +17,11 @@ public:
 	~HMM();
 	int* getIdealStateSequence(unsigned int* obs, unsigned int size);
 	void trainModel(const HMMDataSet& dataset, unsigned int iterations = 10, unsigned int n_folds = 10, unsigned int fold_index = 0, bool early_stop = true, unsigned int patience = 1);
-	void print_mats() const;
+	void printMats() const;
 	void reset(ProbInit* initializer);
-	friend void pickle_hmm(HMM* hmm, std::string fpath);
-	friend void initialize_hmm(HMM* hmm, std::string fpath);
-	friend HMM load_hmm(std::string fpath);
+	friend void pickleHmm(HMM* hmm, std::string fpath);
+	friend void initializeHmm(HMM* hmm, std::string fpath);
+	friend HMM loadHmm(std::string fpath);
 	void setDataMapper(const DataMapper& o);
 
 	void testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const;
