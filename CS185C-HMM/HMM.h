@@ -19,9 +19,7 @@ public:
 	void trainModel(const HMMDataSet& dataset, unsigned int iterations = 10, unsigned int n_folds = 10, unsigned int fold_index = 0, bool early_stop = true, unsigned int patience = 1);
 	void printMats() const;
 	void reset(ProbInit* initializer);
-	friend void pickleHmm(HMM* hmm, std::string fpath);
-	friend void initializeHmm(HMM* hmm, std::string fpath);
-	friend HMM loadHmm(std::string fpath);
+
 	void setDataMapper(const DataMapper& o);
 
 	void testClassifier(const HMMDataSet& positives, const HMMDataSet& negatives, float thresh) const;
@@ -30,6 +28,13 @@ public:
 
 	unsigned int getM();
 	unsigned int getN();
+
+	// friend functions (refactors should get rid/reduce these)
+	friend void pickleHmm(HMM* hmm, std::string fpath);
+	friend void initializeHmm(HMM* hmm, std::string fpath);
+	friend HMM loadHmm(std::string fpath);
+	friend void generateEmbeddings(const HMMDataSet& positives, const HMMDataSet& negatives, const DataMapper& map, unsigned int N, unsigned int M, float* results);
+	friend void calcWordEmbeddings(unsigned int** data, unsigned int* length, unsigned int size, unsigned int N, unsigned int M, float* results, unsigned int max_l, const DataMapper& map);
 
 private:
 	struct AdjustmentAccumulator {

@@ -226,6 +226,44 @@ HMMDataSet HMMDataSet::getRemapped(const DataMapper& mapper) const {
 	return r_set;
 }
 
+std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>> HMMDataSet::getPartitions(unsigned int count) const {
+	if (count == 0 || count > size) { // bad arguments?
+		return std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>>(); // return an empty partition vector
+	}
+
+	unsigned int partition_size = size / count;
+
+	std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>> r_val;
+	unsigned int entry_count = 0;
+	unsigned int** current_part = data;
+	unsigned int* current_part_l = lengths;
+
+	for (unsigned int i = 0; i < count - 1; i++) {
+		r_val.push_back(
+			std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>
+			(
+				current_part,
+				std::pair<unsigned int, unsigned int*>(partition_size, current_part_l)
+			)
+		);
+		current_part = current_part + partition_size; // move our pointers to the next partition
+		current_part_l = current_part_l + partition_size;
+		entry_count += partition_size;
+
+	}
+
+	unsigned int final_size = size - entry_count; // count of however many entries are left
+	r_val.push_back(
+		std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>
+		(
+			current_part,
+			std::pair<unsigned int, unsigned int*>(final_size, current_part_l)
+			)
+	);
+
+	return r_val;
+}
+
 
 NFoldIterator::NFoldIterator(const HMMDataSet& _loader, unsigned int _nfolds): loader(_loader) {
 	nfolds = _nfolds;

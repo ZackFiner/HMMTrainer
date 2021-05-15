@@ -56,6 +56,7 @@ public:
 	unsigned int* getLengthsPtr() const;
 	HMMDataSet& operator=(const HMMDataSet& o);
 	HMMDataSet getRemapped(const DataMapper& other) const;
+	std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>> getPartitions(unsigned int) const;
 private:
 	void bufferData(DataLoader* loader);
 	DataMapper symbol_map;
