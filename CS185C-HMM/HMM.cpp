@@ -15,7 +15,7 @@ HMM::HMM(float* _A, float* _B, float* _Pi, unsigned int _N, unsigned int _M) {
 	this->A = _A;
 	this->A_T = transpose(this->A, _N, _N);
 	this->B = transpose(_B, _N, _M);
-	deleteArray(_B, _N, _M);
+	delArray(_B, _N, _M);
 	this->Pi = _Pi;
 	
 	this->N = _N;
@@ -32,9 +32,9 @@ HMM::HMM(const HMM& o): native_symbolmap(o.native_symbolmap) {
 }
 
 HMM& HMM::operator=(const HMM& o) {
-	deleteArray(A, N, N);
-	deleteArray(A_T, N, N);
-	deleteArray(B, M, N);
+	delArray(A, N, N);
+	delArray(A_T, N, N);
+	delArray(B, M, N);
 	delete[] Pi;
 
 	native_symbolmap = o.native_symbolmap;
@@ -54,7 +54,7 @@ HMM::HMM(unsigned int _N, unsigned int _M, ProbInit* initializer) {
 	this->B = init->BInit(_N, _M);
 	this->A_T = transpose(this->A, _N, _N);
 	float* T_B = transpose(this->B, _N, _M); // transpose our B array for simplified processing
-	deleteArray(this->B, _N, _M);
+	delArray(this->B, _N, _M);
 	this->B = T_B;
 	
 	this->Pi = init->PiIinit(_N);
@@ -64,9 +64,9 @@ HMM::HMM(unsigned int _N, unsigned int _M, ProbInit* initializer) {
 }
 
 HMM::~HMM() {
-	deleteArray(this->A, N, N);
-	deleteArray(this->B, M, N); // remember, B is transposed
-	deleteArray(this->A_T, N, N);
+	delArray(this->A, N, N);
+	delArray(this->B, M, N); // remember, B is transposed
+	delArray(this->A_T, N, N);
 	delete[] this->Pi;
 }
 
@@ -74,9 +74,9 @@ unsigned int HMM::getM() { return M; }
 unsigned int HMM::getN() { return N; }
 
 void HMM::reset(ProbInit* initializer) {
-	deleteArray(this->A, N, N);
-	deleteArray(this->B, M, N); // remember, B is transposed
-	deleteArray(this->A_T, N, N);
+	delArray(this->A, N, N);
+	delArray(this->B, M, N); // remember, B is transposed
+	delArray(this->A_T, N, N);
 	delete[] this->Pi;
 
 	DefaultProbInit def_init;
@@ -85,7 +85,7 @@ void HMM::reset(ProbInit* initializer) {
 	this->B = init->BInit(N, M);
 	this->A_T = transpose(this->A, N, N);
 	float* T_B = transpose(this->B, N, M); // transpose our B array for simplified processing
-	deleteArray(this->B, N, M);
+	delArray(this->B, N, M);
 	this->B = T_B;
 
 	this->Pi = init->PiIinit(N);
@@ -128,10 +128,10 @@ int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
 		r_array[t] = getStateAtT(gamma, size, t);
 	}
 
-	deleteArray(alpha, size, N);
-	deleteArray(beta, size, N);
-	deleteArray(gamma, size, N);
-	deleteArray3(digamma, size, N, N);
+	delArray(alpha, size, N);
+	delArray(beta, size, N);
+	delArray(gamma, size, N);
+	delArray3(digamma, size, N, N);
 	delete[] coeffs;
 
 	return r_array;
@@ -438,10 +438,10 @@ void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
 }
 
 HMM::AdjustmentAccumulator::~AdjustmentAccumulator() {
-	deleteArray(this->A_digamma_accum, N, N);
-	deleteArray(this->A_gamma_accum, N, N);
-	deleteArray(this->B_gamma_accum, M, N);
-	deleteArray(this->B_obs_accum, M, N);
+	delArray(this->A_digamma_accum, N, N);
+	delArray(this->A_gamma_accum, N, N);
+	delArray(this->B_gamma_accum, M, N);
+	delArray(this->B_obs_accum, M, N);
 	if (this->pi_accum)
 		delete[] this->pi_accum;
 	this->initialized = false;
@@ -880,14 +880,14 @@ void HMM::EvaluationWorker::initialize(
 }
 
 HMM::EvaluationWorker::~EvaluationWorker() {
-	deleteArray(alpha, max_length, N);
+	delArray(alpha, max_length, N);
 	delete[] coeffs;
 }
 
 HMM::TrainingWorker::~TrainingWorker() {
-	deleteArray(alpha, sequence_count, N); // allocate enough space for the largest observation sequence
-	deleteArray(beta, sequence_count, N);
-	deleteArray(digamma, N, N);
+	delArray(alpha, sequence_count, N); // allocate enough space for the largest observation sequence
+	delArray(beta, sequence_count, N);
+	delArray(digamma, N, N);
 	if (coeffs)
 		delete[] coeffs;
 
@@ -983,7 +983,7 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 	std::cout << "TPR: " << ((float)tp / (float)(tp + fn)) << std::endl;
 	std::cout << "FPR: " << ((float)fp / (float)(tn + fp)) << std::endl;
 
-	deleteArray(alpha, max_t_size, N);
+	delArray(alpha, max_t_size, N);
 	delete[] coeffs;
 }
 
@@ -1065,7 +1065,7 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 		index += 2;
 	}
 
-	deleteArray(alpha, max_t_size, N);
+	delArray(alpha, max_t_size, N);
 	delete[] coeffs;
 }
 

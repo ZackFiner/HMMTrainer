@@ -23,14 +23,14 @@ void transposeEmplace(float* mat, unsigned int N, unsigned int M, float* dest) {
 	}
 }
 
-void deleteArray(float* mat, unsigned int N, unsigned int M) {
+void delArray(float* mat, unsigned int N, unsigned int M) {
 	if (!mat)
 		return;
 
 	delete[] mat;
 }
 
-void deleteArray3(float* arr, unsigned int N, unsigned int M, unsigned int R) {
+void delArray3(float* arr, unsigned int N, unsigned int M, unsigned int R) {
 	if (!arr)
 		return;
 

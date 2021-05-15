@@ -3,8 +3,8 @@
 #include <string>
 float* transpose(float* mat, unsigned int N, unsigned int M);
 void transposeEmplace(float* mat, unsigned int N, unsigned int M, float* dest);
-void deleteArray(float* mat, unsigned int N, unsigned int M);
-void deleteArray3(float* arr, unsigned int N, unsigned int M, unsigned int R);
+void delArray(float* mat, unsigned int N, unsigned int M);
+void delArray3(float* arr, unsigned int N, unsigned int M, unsigned int R);
 float* allocMat(unsigned int N, unsigned int M);
 float getMaxAbs(float* mat, unsigned int N, unsigned int M);
 float* allocMat(float* init, unsigned int N, unsigned int M);
