@@ -34,7 +34,16 @@ public:
 	friend void initializeHmm(HMM* hmm, std::string fpath);
 	friend HMM loadHmm(std::string fpath);
 	friend void generateEmbeddings(const HMMDataSet& positives, const HMMDataSet& negatives, const DataMapper& map, unsigned int N, unsigned int M, float* results);
-	friend void calcWordEmbeddings(unsigned int** data, unsigned int* length, unsigned int size, unsigned int N, unsigned int M, float* results, unsigned int max_l, const DataMapper& map);
+	friend void calcWordEmbeddings(
+		unsigned int** data,
+		unsigned int* length,
+		unsigned int size,
+		unsigned int N,
+		unsigned int M,
+		float* results,
+		unsigned int max_length,
+		const DataMapper& map
+	);
 
 private:
 	struct AdjustmentAccumulator {

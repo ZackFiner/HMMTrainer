@@ -7,6 +7,7 @@
 #include "MatUtil.h"
 #include "ProbInit.h"
 #include "HmmUtil.h"
+#include "HMMTrainers.h"
 #include "Master.h"
 
 int main() {
@@ -14,10 +15,26 @@ int main() {
 #define N 10
 #define M 20
 
+	float testB[] = {
+		0.75f, 0.125f, 0.125f, 0.0f,
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.25f, 0.5f, 0.125f, 0.125f,
+		0.75f, 0.25f, 0.0f, 0.0f
+	};
+	float* test_b = transpose(testB, 4, 4);
+	printMatrix(test_b, 4, 4);
+	float* vec = new float[16];
+	getSortedColumnVec(test_b, 4, 4, vec);
+	printMatrix(vec, 16, 1);
+
+	delete[] test_b;
+	delete[] vec;
+	/*
 	NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot");
 	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot_stats.csv", M);
 	HMMDataSet winwebsec_dataset = HMMDataSet(&loader, winwebsec_mapper);
 	winwebsec_dataset.printExample(0);
+	*/
 	/*
 	DefaultProbInit initializer(0.99f);
 	HMM hmm = HMM(N, winwebsec_dataset.getSymbolCount(), &initializer);
@@ -31,7 +48,7 @@ int main() {
 		hmm.reset(&initializer);
 	}*/
 	
-	
+	/*
 	HMM hmm(50, 30);
 	initializeHmm(&hmm, "K:\\GitHub\\CS185C-HMM\\hmm_50_30_za.hmm");
 	hmm.setDataMapper(winwebsec_mapper);
@@ -53,7 +70,7 @@ int main() {
 		20,
 		10,
 		0);
-	
+	*/
 	
 	/*
 	hmm.testClassifier(winwebsec_dataset, zbot_dataset, -1.85f);

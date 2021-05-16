@@ -163,7 +163,7 @@ void generateEmbeddings(const HMMDataSet& positives, const HMMDataSet& negatives
 		unsigned int* lengths = pos_partitions[i].second.second;
 		unsigned int max_l = positives.getMaxLength();
 		threads.emplace_back(
-			std::thread(calcWordEmbeddings, part, lengths, length, cur_results, max_l, map)
+			std::thread(calcWordEmbeddings, part, lengths, length, N, M, cur_results, max_l, map)
 		);
 
 		cur_results = cur_results + length;
@@ -175,7 +175,7 @@ void generateEmbeddings(const HMMDataSet& positives, const HMMDataSet& negatives
 		unsigned int length = neg_partitions[i].second.first;
 		unsigned int* lengths = neg_partitions[i].second.second;
 		threads.emplace_back(
-			std::thread(calcWordEmbeddings, part, lengths, length, cur_results, max_l, map)
+			std::thread(calcWordEmbeddings, part, lengths, length, N, M, cur_results, max_l, map)
 		);
 
 		cur_results = cur_results + length;
