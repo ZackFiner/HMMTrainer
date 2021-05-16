@@ -72,6 +72,15 @@ void calcWordEmbeddings(
 		unsigned int* seq = data[i];
 		unsigned int seq_l = length[i];
 
+
+		/*
+		* 	// Dr. Stamp's paper outlines how the number of random restarts needed depends on the length of the sequence:
+			// 30k+ symbols = 10 restarts
+			// 10-30k symbols = 30 restarts
+			// 5k-10k symbols = 100 restarts
+			// fewer than 500 = 500 restarts
+		* Chandak, A., Lee, W., & Stamp, M. (2021). A Comparison of Word2Vec, HMM2Vec, and PCA2Vec for Malware Classification. CoRR, abs/2103.05763.
+		*/
 		std::vector<HMM> hmms;
 		for (unsigned int j = 0; j < RANDOM_RESTARTS; j++) {
 			HMM hmm(N, M); // new HMM
