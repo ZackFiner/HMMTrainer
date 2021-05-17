@@ -1,6 +1,7 @@
 #pragma once
 #include "DataSet.h"
 
+inline void getSortedColumnVec(float* B, unsigned int N, unsigned int M, float* vec);
 void calcWordEmbeddings(
 	unsigned int** data,
 	unsigned int* length,
@@ -11,6 +12,4 @@ void calcWordEmbeddings(
 	unsigned int max_length,
 	const DataMapper& map
 );
-void generateEmbeddings(const HMMDataSet& positives, const HMMDataSet& negatives, const DataMapper& map, unsigned int N, unsigned int M, float* results);
-
-inline void getSortedColumnVec(float* B, unsigned int N, unsigned int M, float* vec);
+void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsigned int N, unsigned int M, float* results);

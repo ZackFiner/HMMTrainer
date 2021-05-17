@@ -24,6 +24,17 @@ DataMapper& DataMapper::operator=(const DataMapper& o) {
 	return *this;
 }
 
+bool operator==(const DataMapper& lhs, const DataMapper& rhs) {
+	if (lhs.size == rhs.size) {
+		return lhs.raw_mapper == rhs.raw_mapper;
+	}
+	return false;
+}
+
+bool operator!=(const DataMapper& lhs, const DataMapper& rhs) {
+	return !(lhs == rhs);
+}
+
 std::unordered_map<unsigned int, std::string> DataMapper::getReverseMap() const {
 	std::unordered_map<unsigned int, std::string> r_val;
 
@@ -224,6 +235,10 @@ HMMDataSet HMMDataSet::getRemapped(const DataMapper& mapper) const {
 	r_set.symbol_map = mapper;
 
 	return r_set;
+}
+
+DataMapper HMMDataSet::getDataMap() const {
+	return symbol_map;
 }
 
 std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>> HMMDataSet::getPartitions(unsigned int count) const {

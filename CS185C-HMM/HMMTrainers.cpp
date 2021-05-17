@@ -4,11 +4,10 @@
 #include <thread>
 
 #define NUM_THREADS 10
-#define RANDOM_RESTARTS 10
 #define MAX_TRAIN_ITERATIONS 100
 
 //#define EARLY_STOPPING
-#define EARLY_STOP_IMPROVEMENT 1e-7
+#define EARLY_STOP_IMPROVEMENT 1e-3
 #define EARLY_STOP_TOLERANCE 3
 
 inline void getSortedColumnVec(float* B, unsigned int N, unsigned int M, float* vec) {
@@ -81,8 +80,13 @@ void calcWordEmbeddings(
 			// fewer than 500 = 500 restarts
 		* Chandak, A., Lee, W., & Stamp, M. (2021). A Comparison of Word2Vec, HMM2Vec, and PCA2Vec for Malware Classification. CoRR, abs/2103.05763.
 		*/
+
+		unsigned int random_restarts = 10;
+		random_restarts = seq_l < 30000 ? 30 : random_restarts;
+		random_restarts = seq_l < 10000 ? 100 : random_restarts;
+		random_restarts = seq_l < 500 ? 500 : random_restarts;
 		std::vector<HMM> hmms;
-		for (unsigned int j = 0; j < RANDOM_RESTARTS; j++) {
+		for (unsigned int j = 0; j < random_restarts; j++) {
 			HMM hmm(N, M); // new HMM
 			hmm.setDataMapper(map); // make sure our symbol map is consistent with the dataset
 			
@@ -94,8 +98,8 @@ void calcWordEmbeddings(
 			
 			for (unsigned int k = 0; k < MAX_TRAIN_ITERATIONS; k++) { // train the HMM
 				acc.reset();
+				hmm.betaPass(seq, seq_l, beta, coeffs);
 				for (unsigned int l = 0; l < seq_l; l++) {
-					hmm.betaPass(seq, seq_l, beta, coeffs);
 					hmm.calcGamma(seq, seq_l, l, alpha, beta, gamma, digamma);
 					hmm.accumAdjust(seq, seq_l, l, gamma, digamma, acc);
 				}
@@ -109,8 +113,10 @@ void calcWordEmbeddings(
 				old_log_prob = new_log_prob;
 
 				if (delta_log_prob > 0.0f && delta_log_prob < EARLY_STOP_IMPROVEMENT) { // early stop if we're moving too slow
-					if (hiccups > EARLY_STOP_TOLERANCE)
+					if (hiccups > EARLY_STOP_TOLERANCE) {
+						std::cout << "Early Stop triggered" << std::endl;
 						break;
+					}
 					hiccups++;
 				}
 				else {
@@ -124,7 +130,7 @@ void calcWordEmbeddings(
 		float best_log_prob = getLogProb(coeffs, seq_l);
 		unsigned int best_hmm_index = 0;
 
-		for (unsigned int j = 1; j < RANDOM_RESTARTS; j++) {
+		for (unsigned int j = 1; j < random_restarts; j++) {
 			hmms[j].alphaPass(seq, seq_l, alpha, coeffs);
 			float log_prob = getLogProb(coeffs, seq_l);
 			if (log_prob > best_log_prob)
@@ -133,7 +139,7 @@ void calcWordEmbeddings(
 
 		getSortedColumnVec(hmms[best_hmm_index].B, N, M, current_result);
 		current_result = current_result + N * M;
-		
+		std::cout << "Done " << best_log_prob << std::endl;
 	}
 
 	delArray(alpha, max_length, N);
@@ -144,7 +150,7 @@ void calcWordEmbeddings(
 }
 
 
-void generateEmbeddings(const HMMDataSet& positives, const HMMDataSet& negatives, const DataMapper& map, unsigned int N, unsigned int M, float* results) {
+void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsigned int N, unsigned int M, float* results) {
 	/*
 	* For each example (sequence):
 	*	1. train several models for the sequence and select the one with the highest probabilitiy (random restarts)
@@ -156,40 +162,31 @@ void generateEmbeddings(const HMMDataSet& positives, const HMMDataSet& negatives
 	*	isn't as applicable. Instead, we can train a lot of these models in parallel. For now, we will create several worker threads, each
 	*	with their own set of HMMs to train, and just let them work sequentially. This will require us to partition our datasets.
 	*/
+	HMMDataSet remap_dataset;
+	std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>> partitions;
 
-
-	auto remap_pos = positives.getRemapped(map);
-	auto remap_neg = negatives.getRemapped(map);
-	auto pos_partitions = remap_pos.getPartitions(NUM_THREADS);
-	auto neg_partitions = remap_neg.getPartitions(NUM_THREADS);
+	if (map == dataset.getDataMap()) {
+		partitions = dataset.getPartitions(NUM_THREADS);
+	}
+	else {
+		remap_dataset = dataset.getRemapped(map);
+		partitions = remap_dataset.getPartitions(NUM_THREADS);
+	}
 
 	std::vector<std::thread> threads;
 	float* cur_results = results;
-	unsigned int max_l = positives.getMaxLength();
+	unsigned int max_l = dataset.getMaxLength();
 	for (unsigned int i = 0; i < NUM_THREADS; i++) {
-		unsigned int** part = pos_partitions[i].first;
-		unsigned int length = pos_partitions[i].second.first;
-		unsigned int* lengths = pos_partitions[i].second.second;
-		unsigned int max_l = positives.getMaxLength();
+		unsigned int** part = partitions[i].first;
+		unsigned int length = partitions[i].second.first;
+		unsigned int* lengths = partitions[i].second.second;
+		unsigned int max_l = dataset.getMaxLength();
 		threads.emplace_back(
 			std::thread(calcWordEmbeddings, part, lengths, length, N, M, cur_results, max_l, map)
 		);
 
-		cur_results = cur_results + length;
+		cur_results = cur_results + length*N*M;// N*M because we are skipping n vectors of length N*M
 	}
-
-	max_l = negatives.getMaxLength();
-	for (unsigned int i = 0; i < NUM_THREADS; i++) {
-		unsigned int** part = neg_partitions[i].first;
-		unsigned int length = neg_partitions[i].second.first;
-		unsigned int* lengths = neg_partitions[i].second.second;
-		threads.emplace_back(
-			std::thread(calcWordEmbeddings, part, lengths, length, N, M, cur_results, max_l, map)
-		);
-
-		cur_results = cur_results + length;
-	}
-
 
 	for (auto& thread : threads)
 		thread.join();

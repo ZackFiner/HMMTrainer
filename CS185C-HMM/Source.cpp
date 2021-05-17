@@ -3,6 +3,7 @@
 #include "HmmUtil.h"
 #include "MatUtil.h"
 #include "DataSet.h"
+#include "HMMTrainers.h"
 #include <sstream>
 
 int twotimes(int x) {
@@ -15,7 +16,8 @@ void getRoc(
 	char* dset1, 
 	char* dset2, 
 	char* hmm_fp, 
-	unsigned int eval_size) {
+	unsigned int eval_size
+) {
 	std::ostringstream factory;
 	factory << std::string(dset1) << "_stats.csv"; 
 	std::string mapper_file1 = factory.str();
@@ -55,7 +57,8 @@ void scoreModelFolds(float* arr,
 	char* abrv,
 	unsigned int M, 
 	unsigned int N,  
-	unsigned int eval_size) {
+	unsigned int eval_size
+) {
 	std::ostringstream factory;
 	factory << std::string(dset1) << "_stats.csv";
 	std::string mapper_file1 = factory.str();
@@ -107,7 +110,8 @@ void evaluateModelFolds(float* arr,
 	char* abrv,
 	unsigned int M,
 	unsigned int N,
-	unsigned int eval_size) {
+	unsigned int eval_size
+) {
 	std::ostringstream factory;
 	factory << std::string(dset1) << "_stats.csv";
 	std::string mapper_file1 = factory.str();
@@ -148,4 +152,27 @@ void evaluateModelFolds(float* arr,
 		tester.evaluateModel(positive_dataset, negative_dataset, fold_head, eval_size);
 		fold_head += fold_size;
 	}
+}
+
+void generatHMMEmbedding(
+	float* arr,
+	unsigned int size,
+	char* dset,
+	char* dmap,
+	unsigned int M,
+	unsigned int N
+) {
+	std::string dataset_fpath(dset);
+	std::string symbolmap_fpath(dmap);
+
+	NewLineSeperatedLoader loader(dataset_fpath);
+	DataMapper map = generateDataMapFromStats(symbolmap_fpath, M);
+	HMMDataSet dataset(&loader, map);
+
+
+	if (size < M * N * dataset.getSize())
+		return;
+
+	generateEmbeddings(dataset, map, N, M, arr);
+
 }

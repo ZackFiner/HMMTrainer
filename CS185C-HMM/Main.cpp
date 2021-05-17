@@ -14,7 +14,7 @@ int main() {
 
 #define N 10
 #define M 20
-
+	/*
 	float testB[] = {
 		0.75f, 0.125f, 0.125f, 0.0f,
 		1.0f, 0.0f, 0.0f, 0.0f,
@@ -29,6 +29,8 @@ int main() {
 
 	delete[] test_b;
 	delete[] vec;
+	*/
+
 	/*
 	NewLineSeperatedLoader loader = NewLineSeperatedLoader("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot");
 	DataMapper winwebsec_mapper = generateDataMapFromStats("K:\\GitHub\\CS185C-HMM\\Debug\\training_data\\zbot_stats.csv", M);

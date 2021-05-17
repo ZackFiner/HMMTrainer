@@ -12,6 +12,8 @@ public:
 	unsigned int getVal(const std::string& v) const;
 	unsigned int getSymbolCount() const;
 	DataMapper& operator=(const DataMapper& o);
+	friend bool operator==(const DataMapper& lhs, const DataMapper& rhs);
+	friend bool operator!=(const DataMapper& lhs, const DataMapper& rhs);
 	std::unordered_map<unsigned int, std::string> getReverseMap() const;
 private:
 	std::unordered_map<std::string, unsigned int> raw_mapper; // this should be 1:1 for now
@@ -56,6 +58,7 @@ public:
 	unsigned int* getLengthsPtr() const;
 	HMMDataSet& operator=(const HMMDataSet& o);
 	HMMDataSet getRemapped(const DataMapper& other) const;
+	DataMapper getDataMap() const;
 	std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>> getPartitions(unsigned int) const;
 private:
 	void bufferData(DataLoader* loader);
