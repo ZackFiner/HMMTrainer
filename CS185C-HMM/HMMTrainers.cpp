@@ -56,6 +56,7 @@ void calcWordEmbeddings(
 	unsigned int M, 
 	float* results, 
 	unsigned int max_length, 
+	unsigned int override_length,
 	const DataMapper& map
 ) {
 	float* alpha = allocMat(max_length, N);
@@ -69,7 +70,7 @@ void calcWordEmbeddings(
 	float* current_result = results;
 	for (unsigned int i = 0; i < size; i++) {
 		unsigned int* seq = data[i];
-		unsigned int seq_l = length[i];
+		unsigned int seq_l = (override_length && override_length < length[i]) ? override_length : length[i];
 
 
 		/*
@@ -150,7 +151,7 @@ void calcWordEmbeddings(
 }
 
 
-void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsigned int N, unsigned int M, float* results) {
+void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsigned int N, unsigned int M, float* results, unsigned int override_length) {
 	/*
 	* For each example (sequence):
 	*	1. train several models for the sequence and select the one with the highest probabilitiy (random restarts)
@@ -182,7 +183,7 @@ void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsign
 		unsigned int* lengths = partitions[i].second.second;
 		unsigned int max_l = dataset.getMaxLength();
 		threads.emplace_back(
-			std::thread(calcWordEmbeddings, part, lengths, length, N, M, cur_results, max_l, map)
+			std::thread(calcWordEmbeddings, part, lengths, length, N, M, cur_results, max_l, override_length, map)
 		);
 
 		cur_results = cur_results + length*N*M;// N*M because we are skipping n vectors of length N*M

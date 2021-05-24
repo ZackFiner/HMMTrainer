@@ -33,7 +33,7 @@ public:
 	friend void pickleHmm(HMM* hmm, std::string fpath);
 	friend void initializeHmm(HMM* hmm, std::string fpath);
 	friend HMM loadHmm(std::string fpath);
-	friend void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsigned int N, unsigned int M, float* results);
+	friend void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsigned int N, unsigned int M, float* results, unsigned int override_length);
 	friend void calcWordEmbeddings(
 		unsigned int** data,
 		unsigned int* length,
@@ -42,6 +42,7 @@ public:
 		unsigned int M,
 		float* results,
 		unsigned int max_length,
+		unsigned int override_length,
 		const DataMapper& map
 	);
 

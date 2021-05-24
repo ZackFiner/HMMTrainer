@@ -160,7 +160,8 @@ void generatHMMEmbedding(
 	char* dset,
 	char* dmap,
 	unsigned int M,
-	unsigned int N
+	unsigned int N,
+	unsigned int override_length
 ) {
 	std::string dataset_fpath(dset);
 	std::string symbolmap_fpath(dmap);
@@ -173,6 +174,6 @@ void generatHMMEmbedding(
 	if (size < M * N * dataset.getSize())
 		return;
 
-	generateEmbeddings(dataset, map, N, M, arr);
+	generateEmbeddings(dataset, map, N, M, arr, override_length);
 
 }

@@ -10,6 +10,7 @@ void calcWordEmbeddings(
 	unsigned int M,
 	float* results,
 	unsigned int max_length,
+	unsigned int override_length,
 	const DataMapper& map
 );
-void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsigned int N, unsigned int M, float* results);
+void generateEmbeddings(const HMMDataSet& dataset, const DataMapper& map, unsigned int N, unsigned int M, float* results, unsigned int override_length);

@@ -46,5 +46,6 @@ extern "C" HMMLIB_API void generatHMMEmbedding(
 	char* dset,
 	char* dmap,
 	unsigned int M,
-	unsigned int N
+	unsigned int N,
+	unsigned int override_length
 );
