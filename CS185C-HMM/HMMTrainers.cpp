@@ -74,7 +74,7 @@ void calcWordEmbeddings(
 
 
 		/*
-		* 	// Dr. Stamp's paper outlines how the number of random restarts needed depends on the length of the sequence:
+		* 	// Chandak et al. outlines how the number of random restarts needed depends on the length of the sequence:
 			// 30k+ symbols = 10 restarts
 			// 10-30k symbols = 30 restarts
 			// 5k-10k symbols = 100 restarts
