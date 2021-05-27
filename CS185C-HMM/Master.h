@@ -39,3 +39,13 @@ extern "C" HMMLIB_API void evaluateModelFolds(
 	unsigned int M,
 	unsigned int N,
 	unsigned int eval_size);
+
+extern "C" HMMLIB_API void generatHMMEmbedding(
+	float* arr,
+	unsigned int size,
+	char* dset,
+	char* dmap,
+	unsigned int M,
+	unsigned int N,
+	unsigned int override_length
+);

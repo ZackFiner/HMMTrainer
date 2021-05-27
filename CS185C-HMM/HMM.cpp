@@ -15,7 +15,7 @@ HMM::HMM(float* _A, float* _B, float* _Pi, unsigned int _N, unsigned int _M) {
 	this->A = _A;
 	this->A_T = transpose(this->A, _N, _N);
 	this->B = transpose(_B, _N, _M);
-	delete_array(_B, _N, _M);
+	delArray(_B, _N, _M);
 	this->Pi = _Pi;
 	
 	this->N = _N;
@@ -25,25 +25,25 @@ HMM::HMM(float* _A, float* _B, float* _Pi, unsigned int _N, unsigned int _M) {
 HMM::HMM(const HMM& o): native_symbolmap(o.native_symbolmap) {
 	this->N = o.N;
 	this->M = o.M;
-	this->A = alloc_mat(o.A, N, N);
-	this->A_T = alloc_mat(o.A_T, N, N);
-	this->B = alloc_mat(o.B, M, N);
-	this->Pi = alloc_vec(o.Pi, N);
+	this->A = allocMat(o.A, N, N);
+	this->A_T = allocMat(o.A_T, N, N);
+	this->B = allocMat(o.B, M, N);
+	this->Pi = allocVec(o.Pi, N);
 }
 
 HMM& HMM::operator=(const HMM& o) {
-	delete_array(A, N, N);
-	delete_array(A_T, N, N);
-	delete_array(B, M, N);
+	delArray(A, N, N);
+	delArray(A_T, N, N);
+	delArray(B, M, N);
 	delete[] Pi;
 
 	native_symbolmap = o.native_symbolmap;
 	this->N = o.N;
 	this->M = o.M;
-	this->A = alloc_mat(o.A, N, N);
-	this->A_T = alloc_mat(o.A_T, N, N);
-	this->B = alloc_mat(o.B, M, N);
-	this->Pi = alloc_vec(o.Pi, N);
+	this->A = allocMat(o.A, N, N);
+	this->A_T = allocMat(o.A_T, N, N);
+	this->B = allocMat(o.B, M, N);
+	this->Pi = allocVec(o.Pi, N);
 	return *this;
 }
 
@@ -54,7 +54,7 @@ HMM::HMM(unsigned int _N, unsigned int _M, ProbInit* initializer) {
 	this->B = init->BInit(_N, _M);
 	this->A_T = transpose(this->A, _N, _N);
 	float* T_B = transpose(this->B, _N, _M); // transpose our B array for simplified processing
-	delete_array(this->B, _N, _M);
+	delArray(this->B, _N, _M);
 	this->B = T_B;
 	
 	this->Pi = init->PiIinit(_N);
@@ -64,9 +64,9 @@ HMM::HMM(unsigned int _N, unsigned int _M, ProbInit* initializer) {
 }
 
 HMM::~HMM() {
-	delete_array(this->A, N, N);
-	delete_array(this->B, M, N); // remember, B is transposed
-	delete_array(this->A_T, N, N);
+	delArray(this->A, N, N);
+	delArray(this->B, M, N); // remember, B is transposed
+	delArray(this->A_T, N, N);
 	delete[] this->Pi;
 }
 
@@ -74,9 +74,9 @@ unsigned int HMM::getM() { return M; }
 unsigned int HMM::getN() { return N; }
 
 void HMM::reset(ProbInit* initializer) {
-	delete_array(this->A, N, N);
-	delete_array(this->B, M, N); // remember, B is transposed
-	delete_array(this->A_T, N, N);
+	delArray(this->A, N, N);
+	delArray(this->B, M, N); // remember, B is transposed
+	delArray(this->A_T, N, N);
 	delete[] this->Pi;
 
 	DefaultProbInit def_init;
@@ -85,7 +85,7 @@ void HMM::reset(ProbInit* initializer) {
 	this->B = init->BInit(N, M);
 	this->A_T = transpose(this->A, N, N);
 	float* T_B = transpose(this->B, N, M); // transpose our B array for simplified processing
-	delete_array(this->B, N, M);
+	delArray(this->B, N, M);
 	this->B = T_B;
 
 	this->Pi = init->PiIinit(N);
@@ -109,11 +109,11 @@ void HMM::setDataMapper(const DataMapper& o) {
 }
 
 int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
-	float* alpha = alloc_mat(size, N);
-	float* beta = alloc_mat(size, N);
-	float* gamma = alloc_mat(size, N);
-	float* digamma = alloc_mat3(size, N, N);
-	float* coeffs = alloc_vec(size);
+	float* alpha = allocMat(size, N);
+	float* beta = allocMat(size, N);
+	float* gamma = allocMat(size, N);
+	float* digamma = allocMat3(size, N, N);
+	float* coeffs = allocVec(size);
 
 
 	alphaPass(obs, size, alpha, coeffs); // calculate alpha
@@ -121,17 +121,17 @@ int* HMM::getIdealStateSequence(unsigned int* obs, unsigned int size) {
 
 	calcGamma(obs, size, alpha, beta, gamma, digamma); // calculate the gammas and di-gammas
 
-	print_matrix(gamma, size, N, true);
+	printMatrix(gamma, size, N, true);
 
 	int* r_array = new int[size];
 	for (unsigned int t = 0; t < size; t++) {
 		r_array[t] = getStateAtT(gamma, size, t);
 	}
 
-	delete_array(alpha, size, N);
-	delete_array(beta, size, N);
-	delete_array(gamma, size, N);
-	delete_array3(digamma, size, N, N);
+	delArray(alpha, size, N);
+	delArray(beta, size, N);
+	delArray(gamma, size, N);
+	delArray3(digamma, size, N, N);
 	delete[] coeffs;
 
 	return r_array;
@@ -434,14 +434,14 @@ void HMM::applyAdjust(const AdjustmentAccumulator& accum) {
 		}
 	}
 
-	transpose_emplace(this->A, N, N, this->A_T);
+	transposeEmplace(this->A, N, N, this->A_T);
 }
 
 HMM::AdjustmentAccumulator::~AdjustmentAccumulator() {
-	delete_array(this->A_digamma_accum, N, N);
-	delete_array(this->A_gamma_accum, N, N);
-	delete_array(this->B_gamma_accum, M, N);
-	delete_array(this->B_obs_accum, M, N);
+	delArray(this->A_digamma_accum, N, N);
+	delArray(this->A_gamma_accum, N, N);
+	delArray(this->B_gamma_accum, M, N);
+	delArray(this->B_obs_accum, M, N);
 	if (this->pi_accum)
 		delete[] this->pi_accum;
 	this->initialized = false;
@@ -452,10 +452,10 @@ void HMM::AdjustmentAccumulator::initialize(unsigned int N, unsigned int M) {
 	this->M = M;
 	this->accumLogProb = 0.0f;
 	this->accumLogProb_v = 0.0f;
-	this->A_digamma_accum = alloc_mat(N, N);
-	this->A_gamma_accum = alloc_mat(N, N);
-	this->B_gamma_accum = alloc_mat(M, N);
-	this->B_obs_accum = alloc_mat(M, N);
+	this->A_digamma_accum = allocMat(N, N);
+	this->A_gamma_accum = allocMat(N, N);
+	this->B_gamma_accum = allocMat(M, N);
+	this->B_obs_accum = allocMat(M, N);
 	this->pi_accum = new float[N];
 	this->initialized = true;
 }
@@ -519,10 +519,10 @@ void HMM::accumAdjust(unsigned int* obs, unsigned int size, float* gamma, float*
 	accum.count += 1;
 }
 
-void HMM::print_mats() const {
-	print_vector(Pi, N, 5U);
-	print_matrix(A, N, N, false, 5U);
-	print_matrix(B, M, N, false, 5U);
+void HMM::printMats() const {
+	printVector(Pi, N, 5U);
+	printMatrix(A, N, N, false, 5U);
+	printMatrix(B, M, N, false, 5U);
 }
 
 void HMM::accumAdjust(unsigned int* obs, unsigned int size, unsigned int t, float* gamma, float* digamma, AdjustmentAccumulator& accum) {
@@ -622,8 +622,8 @@ void HMM::trainModel(const HMMDataSet& dataset, unsigned int iterations, unsigne
 
 		last_validation_score = accum.accumLogProb_v;
 		last_training_score = accum.accumLogProb;
-		print_vector(Pi, N);
-		print_matrix(A, N, N, false);
+		printVector(Pi, N);
+		printMatrix(A, N, N, false);
 		//print_matrix(B, M, N, false);
 		std::cout << "Training Score: " << accum.accumLogProb << std::endl;
 		std::cout << "Validation Score: " << accum.accumLogProb_v << std::endl;
@@ -851,11 +851,11 @@ void HMM::TrainingWorker::initialize(
 
 	// note: These are too big, the sequence count can be > 20,000 in some cases: you need to find a way to use less memory
 	// Solution: don't pre-compute digamma and gamma along t, just compute it for one t at a time, store it, and then accumulate each computation
-	alpha = alloc_mat(sequence_count, N); // allocate enough space for the largest observation sequence
-	beta = alloc_mat(sequence_count, N);
-	gamma = alloc_vec(N);
-	digamma = alloc_mat(N, N);
-	coeffs = alloc_vec(sequence_count);
+	alpha = allocMat(sequence_count, N); // allocate enough space for the largest observation sequence
+	beta = allocMat(sequence_count, N);
+	gamma = allocVec(N);
+	digamma = allocMat(N, N);
+	coeffs = allocVec(sequence_count);
 }
 
 void HMM::EvaluationWorker::initialize(
@@ -875,19 +875,19 @@ void HMM::EvaluationWorker::initialize(
 	case_lengths = _case_lengths;
 	case_count = _case_count;
 
-	alpha = alloc_mat(max_length, N);
-	coeffs = alloc_vec(max_length);
+	alpha = allocMat(max_length, N);
+	coeffs = allocVec(max_length);
 }
 
 HMM::EvaluationWorker::~EvaluationWorker() {
-	delete_array(alpha, max_length, N);
+	delArray(alpha, max_length, N);
 	delete[] coeffs;
 }
 
 HMM::TrainingWorker::~TrainingWorker() {
-	delete_array(alpha, sequence_count, N); // allocate enough space for the largest observation sequence
-	delete_array(beta, sequence_count, N);
-	delete_array(digamma, N, N);
+	delArray(alpha, sequence_count, N); // allocate enough space for the largest observation sequence
+	delArray(beta, sequence_count, N);
+	delArray(digamma, N, N);
 	if (coeffs)
 		delete[] coeffs;
 
@@ -954,8 +954,8 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 	unsigned int neg_size = remapped_neg.getSize();
 	
 	unsigned int max_t_size = std::max(remapped_pos.getMaxLength(), remapped_neg.getMaxLength());
-	float* alpha = alloc_mat(max_t_size, N);
-	float* coeffs = alloc_vec(max_t_size);
+	float* alpha = allocMat(max_t_size, N);
+	float* coeffs = allocVec(max_t_size);
 	
 	
 	for (unsigned int i = 0; i < pos_size; i++) {
@@ -983,7 +983,7 @@ void HMM::testClassifier(const HMMDataSet& positives, const HMMDataSet& negative
 	std::cout << "TPR: " << ((float)tp / (float)(tp + fn)) << std::endl;
 	std::cout << "FPR: " << ((float)fp / (float)(tn + fp)) << std::endl;
 
-	delete_array(alpha, max_t_size, N);
+	delArray(alpha, max_t_size, N);
 	delete[] coeffs;
 }
 
@@ -1000,8 +1000,8 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 	unsigned int neg_size = remapped_neg.getSize();
 
 	unsigned int max_t_size = std::max(remapped_pos.getMaxLength(), remapped_neg.getMaxLength());
-	float* alpha = alloc_mat(max_t_size, N);
-	float* coeffs = alloc_vec(max_t_size);
+	float* alpha = allocMat(max_t_size, N);
+	float* coeffs = allocVec(max_t_size);
 
 	std::vector<float> positive_probs;
 	std::vector<float> negative_probs;
@@ -1065,7 +1065,7 @@ void HMM::generateROC(const HMMDataSet& positives, const HMMDataSet& negatives, 
 		index += 2;
 	}
 
-	delete_array(alpha, max_t_size, N);
+	delArray(alpha, max_t_size, N);
 	delete[] coeffs;
 }
 

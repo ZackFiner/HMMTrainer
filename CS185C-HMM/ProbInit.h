@@ -9,7 +9,7 @@ public:
 
 class DefaultProbInit : public ProbInit {
 public:
-	DefaultProbInit(float _variance=0.1);
+	DefaultProbInit(float _variance=0.99f);
 	float* AInit(unsigned int N);
 	float* BInit(unsigned int N, unsigned int M);
 	float* PiIinit(unsigned int N);

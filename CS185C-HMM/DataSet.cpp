@@ -24,6 +24,17 @@ DataMapper& DataMapper::operator=(const DataMapper& o) {
 	return *this;
 }
 
+bool operator==(const DataMapper& lhs, const DataMapper& rhs) {
+	if (lhs.size == rhs.size) {
+		return lhs.raw_mapper == rhs.raw_mapper;
+	}
+	return false;
+}
+
+bool operator!=(const DataMapper& lhs, const DataMapper& rhs) {
+	return !(lhs == rhs);
+}
+
 std::unordered_map<unsigned int, std::string> DataMapper::getReverseMap() const {
 	std::unordered_map<unsigned int, std::string> r_val;
 
@@ -224,6 +235,48 @@ HMMDataSet HMMDataSet::getRemapped(const DataMapper& mapper) const {
 	r_set.symbol_map = mapper;
 
 	return r_set;
+}
+
+DataMapper HMMDataSet::getDataMap() const {
+	return symbol_map;
+}
+
+std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>> HMMDataSet::getPartitions(unsigned int count) const {
+	if (count == 0 || count > size) { // bad arguments?
+		return std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>>(); // return an empty partition vector
+	}
+
+	unsigned int partition_size = size / count;
+
+	std::vector<std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>> r_val;
+	unsigned int entry_count = 0;
+	unsigned int** current_part = data;
+	unsigned int* current_part_l = lengths;
+
+	for (unsigned int i = 0; i < count - 1; i++) {
+		r_val.push_back(
+			std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>
+			(
+				current_part,
+				std::pair<unsigned int, unsigned int*>(partition_size, current_part_l)
+			)
+		);
+		current_part = current_part + partition_size; // move our pointers to the next partition
+		current_part_l = current_part_l + partition_size;
+		entry_count += partition_size;
+
+	}
+
+	unsigned int final_size = size - entry_count; // count of however many entries are left
+	r_val.push_back(
+		std::pair<unsigned int**, std::pair<unsigned int, unsigned int*>>
+		(
+			current_part,
+			std::pair<unsigned int, unsigned int*>(final_size, current_part_l)
+			)
+	);
+
+	return r_val;
 }
 
 

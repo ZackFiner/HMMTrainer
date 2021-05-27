@@ -340,3 +340,9 @@ ASALocalRun/
 
 # BeatPulse healthcheck temp database
 healthchecksdb
+
+# any .hmm, .npy, .npz or .csv files should be ignored
+*.hmm
+*.npy
+*.npz
+*.csv
